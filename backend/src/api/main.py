@@ -10,7 +10,7 @@ from src.api.auth import APIKeyAuthMiddleware
 from src.api.exceptions import register_exception_handlers
 from src.api.middleware import RequestLoggingMiddleware, SecurityHeadersMiddleware
 from src.api.rate_limit import configure_rate_limiting
-from src.api.routers import capsules, columns, compliance, conformance, domains, health, ingest, reports, violations
+from src.api.routers import capsules, columns, compliance, conformance, domains, graph, health, ingest, products, reports, tags, violations
 from src.cache import close_cache, init_cache
 from src.config import get_settings, validate_config
 from src.database import close_db, init_db, engine
@@ -142,6 +142,18 @@ OPENAPI_TAGS = [
         "description": "Business domain organization and ownership"
     },
     {
+        "name": "products",
+        "description": "Data Products - logical groupings of capsules with SLOs"
+    },
+    {
+        "name": "tags",
+        "description": "Tag management - create, search, and associate tags with capsules and columns"
+    },
+    {
+        "name": "graph",
+        "description": "Graph export - export property graph in GraphML, DOT, Cypher, Mermaid, and JSON-LD formats"
+    },
+    {
         "name": "reports",
         "description": "Report generation in various formats (JSON, CSV, HTML)"
     },
@@ -204,6 +216,11 @@ def create_app() -> FastAPI:
     app.include_router(conformance.router, prefix=settings.api_prefix, tags=["conformance"])
     app.include_router(violations.router, prefix=settings.api_prefix, tags=["violations"])
     app.include_router(domains.router, prefix=settings.api_prefix, tags=["domains"])
+    app.include_router(products.router, prefix=settings.api_prefix, tags=["products"])
+    app.include_router(tags.router, prefix=settings.api_prefix, tags=["tags"])
+    app.include_router(tags.capsule_tags_router, prefix=settings.api_prefix, tags=["tags"])
+    app.include_router(tags.column_tags_router, prefix=settings.api_prefix, tags=["tags"])
+    app.include_router(graph.router, prefix=settings.api_prefix, tags=["graph"])
     app.include_router(reports.router, prefix=settings.api_prefix, tags=["reports"])
 
     # Register exception handlers

@@ -8,6 +8,9 @@ A read-only architecture intelligence platform that ingests metadata from data i
 - **PII Lineage Tracking**: Trace sensitive data through transformation pipelines, detect exposure risks
 - **Architecture Conformance**: Validate data models against defined standards (Medallion, naming conventions, etc.)
 - **Graph-Based Analysis**: Query lineage, impact analysis, and redundancy detection
+- **Data Products**: Group capsules into logical data products with SLO tracking (Data Mesh pattern)
+- **Tag Management**: Apply and query tags as graph edges (TAGGED_WITH relationships)
+- **Graph Export**: Export property graph in multiple formats (GraphML, DOT, Cypher, Mermaid, JSON-LD)
 
 ## Quick Start
 
@@ -76,6 +79,8 @@ data-arch-brain/
 
 ## API Endpoints
 
+### Core Endpoints
+
 | Endpoint | Description |
 |----------|-------------|
 | `GET /api/v1/health` | Health check |
@@ -88,9 +93,47 @@ data-arch-brain/
 | `GET /api/v1/conformance/score` | Conformance score |
 | `GET /api/v1/conformance/violations` | List violations |
 
+### Data Products
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/v1/products` | List all data products |
+| `POST /api/v1/products` | Create a data product |
+| `GET /api/v1/products/{id}` | Get data product details |
+| `POST /api/v1/products/{id}/capsules/{capsule_id}` | Add capsule to product (PART_OF edge) |
+| `GET /api/v1/products/{id}/slo-status` | Get SLO compliance status |
+
+### Tag Management
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/v1/tags` | List all tags |
+| `POST /api/v1/tags` | Create a tag |
+| `POST /api/v1/tags/capsules/{id}/{tag_id}` | Tag a capsule (TAGGED_WITH edge) |
+| `POST /api/v1/tags/columns/{id}/{tag_id}` | Tag a column |
+| `GET /api/v1/tags/{tag_id}/capsules` | Get capsules with tag |
+
+### Graph Export
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/v1/graph/formats` | List available export formats |
+| `GET /api/v1/graph/export` | Export full property graph |
+| `GET /api/v1/graph/export/lineage/{urn}` | Export lineage subgraph |
+
 API documentation available at:
 - Swagger UI: http://localhost:8001/api/v1/docs
 - ReDoc: http://localhost:8001/api/v1/redoc
+
+### Graph Export Formats
+
+| Format | Use Cases |
+|--------|----------|
+| `graphml` | yEd, Gephi, Cytoscape, NetworkX |
+| `dot` | Graphviz visualization |
+| `cypher` | Neo4j, Amazon Neptune import |
+| `mermaid` | GitHub, GitLab, Notion diagrams |
+| `json-ld` | Semantic web, RDF tools |
 
 ## CLI Usage
 
@@ -167,12 +210,15 @@ Environment variables (see `backend/.env.example`):
 
 ## Documentation
 
+- [User Guide](docs/USER_GUIDE.md) - CLI and API usage guide
+- [Runbook](docs/RUNBOOK.md) - Operational guide for running the service
 - [Product Specification](docs/specs/product_specification.md)
 - [System Architecture](docs/design_docs/system_architecture.md)
 - [Database Schema](docs/design_docs/database_schema.md)
 - [API Specification](docs/design_docs/api_specification.md)
 - [Component Design](docs/design_docs/component_design.md)
 - [Deployment Guide](docs/design_docs/deployment.md)
+- [Implementation Gaps](docs/IMPLEMENTATION_GAPS.md) - Feature status tracking
 
 ## Technology Stack
 

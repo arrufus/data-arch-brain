@@ -754,6 +754,176 @@ curl -H "X-API-Key: your-api-key" \
   "http://localhost:8002/api/v1/reports/capsule-summary?layer=gold&format=json"
 ```
 
+### Data Product Endpoints
+
+Data Products allow you to group capsules into logical units with SLO tracking (Data Mesh pattern).
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/products` | GET | List all data products |
+| `/api/v1/products` | POST | Create a new data product |
+| `/api/v1/products/{id}` | GET | Get data product details |
+| `/api/v1/products/{id}` | PUT | Update data product |
+| `/api/v1/products/{id}` | DELETE | Delete data product |
+| `/api/v1/products/{id}/capsules` | GET | List capsules in data product |
+| `/api/v1/products/{id}/capsules/{capsule_id}` | POST | Add capsule to data product |
+| `/api/v1/products/{id}/capsules/{capsule_id}` | DELETE | Remove capsule from data product |
+| `/api/v1/products/{id}/slo-status` | GET | Get SLO compliance status |
+
+```bash
+# List all data products
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8002/api/v1/products"
+
+# Create a data product
+curl -X POST "http://localhost:8002/api/v1/products" \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Customer Analytics",
+    "description": "Customer data product for marketing analytics",
+    "domain_id": "uuid-of-domain",
+    "slo_freshness_hours": 24,
+    "slo_availability_percent": 99.9,
+    "slo_quality_threshold": 0.95
+  }'
+
+# Add a capsule to a data product (PART_OF edge)
+curl -X POST "http://localhost:8002/api/v1/products/{product_id}/capsules/{capsule_id}" \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"role": "output"}'
+
+# Check SLO status
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8002/api/v1/products/{product_id}/slo-status"
+# Response: {"freshness_met": true, "availability_met": true, "quality_met": false, "overall_status": "degraded"}
+```
+
+### Tag Management Endpoints
+
+Tags can be applied to capsules and columns as graph edges (TAGGED_WITH relationship).
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/tags` | GET | List all tags |
+| `/api/v1/tags` | POST | Create a new tag |
+| `/api/v1/tags/{id}` | GET | Get tag details |
+| `/api/v1/tags/{id}` | PUT | Update tag |
+| `/api/v1/tags/{id}` | DELETE | Delete tag |
+| `/api/v1/tags/capsules/{capsule_id}` | GET | Get tags for a capsule |
+| `/api/v1/tags/capsules/{capsule_id}/{tag_id}` | POST | Add tag to capsule |
+| `/api/v1/tags/capsules/{capsule_id}/{tag_id}` | DELETE | Remove tag from capsule |
+| `/api/v1/tags/columns/{column_id}` | GET | Get tags for a column |
+| `/api/v1/tags/columns/{column_id}/{tag_id}` | POST | Add tag to column |
+| `/api/v1/tags/columns/{column_id}/{tag_id}` | DELETE | Remove tag from column |
+| `/api/v1/tags/{tag_id}/capsules` | GET | Get all capsules with a tag |
+| `/api/v1/tags/{tag_id}/columns` | GET | Get all columns with a tag |
+
+```bash
+# Create a tag
+curl -X POST "http://localhost:8002/api/v1/tags" \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "pii",
+    "category": "compliance",
+    "description": "Contains personally identifiable information",
+    "color": "#FF0000",
+    "sensitivity_level": "high"
+  }'
+
+# Tag a capsule
+curl -X POST "http://localhost:8002/api/v1/tags/capsules/{capsule_id}/{tag_id}" \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"added_by": "john.doe@company.com"}'
+
+# Find all capsules with a specific tag
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8002/api/v1/tags/{tag_id}/capsules"
+
+# Get tags for a column
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8002/api/v1/tags/columns/{column_id}"
+```
+
+### Graph Export Endpoints
+
+Export the property graph in various formats for visualization and integration with external tools.
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/graph/formats` | GET | List available export formats |
+| `/api/v1/graph/export` | GET | Export full property graph |
+| `/api/v1/graph/export/lineage/{urn}` | GET | Export lineage subgraph for a capsule |
+
+**Supported Export Formats:**
+
+| Format | Content-Type | Use Cases |
+|--------|-------------|-----------|
+| `graphml` | `application/xml` | yEd, Gephi, Cytoscape, NetworkX |
+| `dot` | `text/plain` | Graphviz (dot, neato, fdp), VSCode extensions |
+| `cypher` | `text/plain` | Neo4j, Amazon Neptune, Memgraph |
+| `mermaid` | `text/plain` | GitHub, GitLab, Notion, Obsidian |
+| `json-ld` | `application/ld+json` | Semantic web, Apache Jena, RDF tools |
+
+```bash
+# List available formats
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8002/api/v1/graph/formats"
+
+# Export full graph in Mermaid format (default)
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8002/api/v1/graph/export" > graph.mmd
+
+# Export in GraphML for Gephi/yEd
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8002/api/v1/graph/export?format=graphml" > graph.graphml
+
+# Export with additional nodes (columns, tags, data products)
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8002/api/v1/graph/export?format=dot&include_columns=true&include_tags=true&include_data_products=true" > full_graph.dot
+
+# Export only a specific domain
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8002/api/v1/graph/export?format=mermaid&domain_id={domain_id}" > domain_graph.mmd
+
+# Export lineage subgraph for a specific capsule
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8002/api/v1/graph/export/lineage/urn:dab:dbt:model:jaffle_shop.marts:dim_customers?format=mermaid&depth=3" > lineage.mmd
+
+# Export upstream lineage only (where data comes from)
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8002/api/v1/graph/export/lineage/urn:dab:dbt:model:project:orders?format=dot&direction=upstream&depth=5" > upstream.dot
+
+# Export for Neo4j import
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8002/api/v1/graph/export?format=cypher" > import.cypher
+
+# Then in Neo4j:
+# cat import.cypher | cypher-shell -u neo4j -p password
+```
+
+**Graph Export Options:**
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `format` | Export format (graphml, dot, cypher, mermaid, json-ld) | `mermaid` |
+| `domain_id` | Filter to specific domain | - |
+| `include_columns` | Include column nodes and CONTAINS edges | `false` |
+| `include_tags` | Include tag nodes and TAGGED_WITH edges | `false` |
+| `include_data_products` | Include data product nodes and PART_OF edges | `false` |
+
+**Lineage Export Options:**
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `format` | Export format | `mermaid` |
+| `depth` | Number of hops to traverse (1-10) | `3` |
+| `direction` | Direction: upstream, downstream, or both | `both` |
+| `include_columns` | Include column-level lineage | `false` |
+
 ---
 
 ## Configuration
