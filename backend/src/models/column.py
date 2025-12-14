@@ -12,6 +12,7 @@ from src.models.base import DABBase, JSONType, URNMixin, fk_ref
 if TYPE_CHECKING:
     from src.models.capsule import Capsule
     from src.models.lineage import ColumnLineage
+    from src.models.tag import ColumnTag
     from src.models.violation import Violation
 
 
@@ -110,6 +111,11 @@ class Column(DABBase, URNMixin):
         "ColumnLineage",
         foreign_keys="ColumnLineage.source_column_id",
         back_populates="source_column",
+    )
+
+    # Tag associations (TAGGED_WITH edges)
+    tag_associations: Mapped[list["ColumnTag"]] = relationship(
+        back_populates="column", cascade="all, delete-orphan"
     )
 
     @property

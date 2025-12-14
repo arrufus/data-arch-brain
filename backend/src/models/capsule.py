@@ -11,10 +11,12 @@ from src.models.base import DABBase, MetadataMixin, URNMixin, fk_ref
 
 if TYPE_CHECKING:
     from src.models.column import Column
+    from src.models.data_product import CapsuleDataProduct
     from src.models.domain import Domain, Owner
     from src.models.ingestion import IngestionJob
     from src.models.lineage import CapsuleLineage
     from src.models.source_system import SourceSystem
+    from src.models.tag import CapsuleTag
     from src.models.violation import Violation
 
 
@@ -108,6 +110,16 @@ class Capsule(DABBase, URNMixin, MetadataMixin):
         "CapsuleLineage",
         foreign_keys="CapsuleLineage.source_id",
         back_populates="source",
+    )
+
+    # Data product associations (PART_OF edges)
+    data_product_associations: Mapped[list["CapsuleDataProduct"]] = relationship(
+        back_populates="capsule", cascade="all, delete-orphan"
+    )
+
+    # Tag associations (TAGGED_WITH edges)
+    tag_associations: Mapped[list["CapsuleTag"]] = relationship(
+        back_populates="capsule", cascade="all, delete-orphan"
     )
 
     @property

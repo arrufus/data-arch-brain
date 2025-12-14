@@ -239,6 +239,136 @@ curl -X POST "http://localhost:8000/api/v1/conformance/evaluate" \
   -d '{"scope": "layer", "layer": "gold"}'
 ```
 
+### Managing Data Products
+
+Data Products group capsules into logical units following the Data Mesh pattern. They track SLO compliance for freshness, availability, and quality.
+
+```bash
+# List all data products
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8000/api/v1/products"
+
+# Create a new data product
+curl -X POST "http://localhost:8000/api/v1/products" \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Customer 360",
+    "description": "Unified customer data product",
+    "domain_id": "uuid-of-domain",
+    "slo_freshness_hours": 24,
+    "slo_availability_percent": 99.9,
+    "slo_quality_threshold": 0.95
+  }'
+
+# Add a capsule to a data product (creates PART_OF edge)
+curl -X POST "http://localhost:8000/api/v1/products/{product_id}/capsules/{capsule_id}" \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"role": "output"}'
+
+# Check SLO status for a data product
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8000/api/v1/products/{product_id}/slo-status"
+# Response: {"freshness_met": true, "availability_met": true, "quality_met": false, "overall_status": "degraded"}
+
+# Remove a capsule from a data product
+curl -X DELETE "http://localhost:8000/api/v1/products/{product_id}/capsules/{capsule_id}" \
+  -H "X-API-Key: your-api-key"
+```
+
+### Managing Tags
+
+Tags are applied to capsules and columns as graph edges (TAGGED_WITH relationship).
+
+```bash
+# Create a new tag
+curl -X POST "http://localhost:8000/api/v1/tags" \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "pii",
+    "category": "compliance",
+    "description": "Personally identifiable information"
+  }'
+
+# Tag a capsule
+curl -X POST "http://localhost:8000/api/v1/tags/capsules/{capsule_id}/{tag_id}" \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"added_by": "ops@company.com"}'
+
+# Tag a column
+curl -X POST "http://localhost:8000/api/v1/tags/columns/{column_id}/{tag_id}" \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"added_by": "ops@company.com"}'
+
+# List all capsules with a specific tag
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8000/api/v1/tags/{tag_id}/capsules"
+
+# Remove a tag from a column
+curl -X DELETE "http://localhost:8000/api/v1/tags/columns/{column_id}/{tag_id}" \
+  -H "X-API-Key: your-api-key"
+```
+
+### Exporting the Property Graph
+
+Export the property graph for visualization tools or integration with graph databases.
+
+```bash
+# List available export formats
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8000/api/v1/graph/formats"
+# Response: ["graphml", "dot", "cypher", "mermaid", "json-ld"]
+
+# Export full graph in Mermaid format (renders in GitHub, GitLab, Notion)
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8000/api/v1/graph/export?format=mermaid" > graph.mmd
+
+# Export in GraphML for Gephi or yEd
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8000/api/v1/graph/export?format=graphml" > graph.graphml
+
+# Export for Neo4j import (Cypher statements)
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8000/api/v1/graph/export?format=cypher" > import.cypher
+
+# Import to Neo4j
+cat import.cypher | cypher-shell -u neo4j -p password
+
+# Export with additional nodes (columns, tags, data products)
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8000/api/v1/graph/export?format=dot&include_columns=true&include_tags=true&include_data_products=true" > full_graph.dot
+
+# Render DOT graph with Graphviz
+dot -Tpng full_graph.dot -o graph.png
+dot -Tsvg full_graph.dot -o graph.svg
+
+# Export lineage subgraph for a specific capsule
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8000/api/v1/graph/export/lineage/urn:dab:dbt:model:project:orders?format=mermaid&depth=3" > orders_lineage.mmd
+
+# Export upstream lineage only (data sources)
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8000/api/v1/graph/export/lineage/urn:dab:dbt:model:project:orders?format=dot&direction=upstream&depth=5" > upstream.dot
+
+# Export downstream lineage only (data consumers)
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8000/api/v1/graph/export/lineage/urn:dab:dbt:model:project:orders?format=mermaid&direction=downstream" > downstream.mmd
+```
+
+**Export Format Use Cases:**
+
+| Format | File Extension | Use Cases |
+|--------|---------------|-----------|
+| `graphml` | `.graphml` | yEd, Gephi, Cytoscape, NetworkX |
+| `dot` | `.dot` | Graphviz, VSCode GraphViz Preview |
+| `cypher` | `.cypher` | Neo4j, Amazon Neptune, Memgraph |
+| `mermaid` | `.mmd` | GitHub, GitLab, Notion, Obsidian |
+| `json-ld` | `.jsonld` | Semantic web, Apache Jena, RDF tools |
+
 ---
 
 ## Incident Response
@@ -399,6 +529,11 @@ curl -X POST "http://localhost:8000/api/v1/conformance/evaluate" \
 | Lineage query (depth 5) | < 500ms | 500 req/s |
 | Full conformance evaluation | < 30s | 10 req/min |
 | Ingestion (10k capsules) | < 60s | - |
+| Data product SLO check | < 100ms | 2,000 req/s |
+| Tag capsule/column | < 50ms | 3,000 req/s |
+| Graph export (Mermaid) | < 2s | 100 req/min |
+| Graph export (GraphML) | < 3s | 50 req/min |
+| Lineage export (depth 3) | < 500ms | 500 req/s |
 
 ### Scaling Guidelines
 

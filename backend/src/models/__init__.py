@@ -3,12 +3,13 @@
 from src.models.base import Base, DABBase, DAB_SCHEMA
 from src.models.capsule import ArchitectureLayer, Capsule, CapsuleType
 from src.models.column import Column, PIIDetectionMethod, PIIType, SemanticType
+from src.models.data_product import CapsuleDataProduct, CapsuleRole, DataProduct, DataProductStatus
 from src.models.domain import Domain, Owner
 from src.models.ingestion import IngestionJob, IngestionStatus
 from src.models.lineage import CapsuleLineage, ColumnLineage
 from src.models.rule import Rule, RuleCategory, RuleScope, RuleSeverity
 from src.models.source_system import SourceSystem
-from src.models.tag import Tag
+from src.models.tag import CapsuleTag, ColumnTag, Tag
 from src.models.violation import Violation, ViolationStatus
 
 __all__ = [
@@ -25,6 +26,11 @@ __all__ = [
     "SemanticType",
     "PIIType",
     "PIIDetectionMethod",
+    # Data Product
+    "DataProduct",
+    "DataProductStatus",
+    "CapsuleDataProduct",
+    "CapsuleRole",
     # Domain
     "Domain",
     "Owner",
@@ -43,6 +49,8 @@ __all__ = [
     "SourceSystem",
     # Tag
     "Tag",
+    "CapsuleTag",
+    "ColumnTag",
     # Violation
     "Violation",
     "ViolationStatus",

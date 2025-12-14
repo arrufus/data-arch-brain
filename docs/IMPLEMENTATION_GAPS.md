@@ -299,6 +299,43 @@ FAILED: test_foreign_key_inference (unimplemented feature)
 | **Surrogate key detection failing** | Tests show it's not implemented | Cannot classify key types |
 | **Foreign key detection failing** | Tests show it's not implemented | Cannot identify relationships |
 
+### 5.6 Property Graph Features [COMPLETED]
+
+| Gap | Status | Implementation |
+|-----|--------|----------------|
+| **DataProduct node missing** | **FIXED** | DataProduct model with PART_OF edges |
+| **Tag edges not traversable** | **FIXED** | CapsuleTag/ColumnTag junction tables |
+| **No graph export** | **FIXED** | 5 export formats (GraphML, DOT, Cypher, Mermaid, JSON-LD) |
+
+**Implementation Details:**
+
+**Phase 1: DataProduct & PART_OF Edges**
+- `src/models/data_product.py` - DataProduct model with SLO fields, CapsuleDataProduct junction
+- `src/repositories/data_product.py` - Full CRUD with capsule management
+- `src/services/slo.py` - SLO status calculation (freshness, availability, quality)
+- `src/api/routers/products.py` - REST API for data products
+- `alembic/versions/20241214_data_products.py` - Database migration
+
+**Phase 2: Tag Edges (TAGGED_WITH)**
+- `src/models/tag.py` - CapsuleTag/ColumnTag junction models with added_by, added_at, meta
+- `src/repositories/tag.py` - TagRepository with edge operations (add/remove/get by entity)
+- `src/api/routers/tags.py` - Tag management API with capsule/column tag endpoints
+- `alembic/versions/20241214_tag_edges.py` - Tag edges migration
+- 28 unit tests in `tests/unit/test_tag_edges.py`
+
+**Phase 3: Graph Export**
+- `src/services/graph_export.py` - GraphExportService with 5 format exporters:
+  - GraphML (for yEd, Gephi, Cytoscape)
+  - DOT (for Graphviz)
+  - Cypher (for Neo4j import)
+  - Mermaid (for documentation)
+  - JSON-LD (for semantic web)
+- `src/api/routers/graph.py` - Export endpoints:
+  - `GET /graph/export` - Full graph export with filters
+  - `GET /graph/export/lineage/{urn}` - Lineage subgraph export
+  - `GET /graph/formats` - List available formats
+- 18 unit tests in `tests/unit/test_graph_export.py`
+
 ---
 
 ## 6. Observability Gaps
@@ -507,3 +544,18 @@ FAILED: test_foreign_key_inference (unimplemented feature)
 | `tests/unit/test_tracing.py` | Distributed tracing tests |
 | `tests/unit/test_config_validation.py` | Config validation tests |
 | `tests/integration/test_api.py` | API integration tests |
+| `tests/unit/test_tag_edges.py` | Tag edge model & API tests (28 tests) |
+| `tests/unit/test_graph_export.py` | Graph export service tests (18 tests) |
+
+### Property Graph Files (Phase 5)
+
+| File | Purpose |
+|------|---------|
+| `src/models/data_product.py` | DataProduct and CapsuleDataProduct models |
+| `src/repositories/data_product.py` | DataProduct repository with CRUD |
+| `src/services/slo.py` | SLO calculation service |
+| `src/api/routers/products.py` | Data Products REST API |
+| `src/repositories/tag.py` | Tag repository with edge operations |
+| `src/api/routers/tags.py` | Tags REST API (includes edge endpoints) |
+| `src/services/graph_export.py` | Graph export in 5 formats |
+| `src/api/routers/graph.py` | Graph export REST API |

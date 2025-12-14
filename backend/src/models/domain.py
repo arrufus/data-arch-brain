@@ -10,6 +10,7 @@ from src.models.base import DABBase, JSONType, fk_ref
 
 if TYPE_CHECKING:
     from src.models.capsule import Capsule
+    from src.models.data_product import DataProduct
 
 
 class Owner(DABBase):
@@ -28,6 +29,7 @@ class Owner(DABBase):
     # Relationships
     capsules: Mapped[list["Capsule"]] = relationship(back_populates="owner")
     domains: Mapped[list["Domain"]] = relationship(back_populates="owner")
+    data_products: Mapped[list["DataProduct"]] = relationship(back_populates="owner")
 
 
 class Domain(DABBase):
@@ -52,3 +54,4 @@ class Domain(DABBase):
     children: Mapped[list["Domain"]] = relationship("Domain", back_populates="parent")
     owner: Mapped[Optional["Owner"]] = relationship(back_populates="domains")
     capsules: Mapped[list["Capsule"]] = relationship(back_populates="domain")
+    data_products: Mapped[list["DataProduct"]] = relationship(back_populates="domain")
