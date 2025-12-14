@@ -11,13 +11,15 @@ from src.config import get_settings
 
 settings = get_settings()
 
-# Create async engine
-engine = create_async_engine(
-    settings.database_url,
-    pool_size=settings.database_pool_size,
-    max_overflow=settings.database_max_overflow,
-    echo=settings.database_echo,
-)
+# Create async engine with dialect-appropriate options
+_engine_kwargs = {"echo": settings.database_echo}
+
+# SQLite doesn't support pool_size/max_overflow
+if "sqlite" not in settings.database_url:
+    _engine_kwargs["pool_size"] = settings.database_pool_size
+    _engine_kwargs["max_overflow"] = settings.database_max_overflow
+
+engine = create_async_engine(settings.database_url, **_engine_kwargs)
 
 # Create session factory
 async_session_maker = async_sessionmaker(

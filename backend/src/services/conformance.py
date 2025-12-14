@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Optional, Sequence
 from uuid import UUID
 
 import yaml
@@ -16,6 +16,11 @@ from sqlalchemy.orm import selectinload
 from src.models.capsule import Capsule
 from src.models.column import Column
 from src.repositories.capsule import CapsuleRepository
+
+if TYPE_CHECKING:
+    from src.models.violation import Violation
+    from src.repositories.rule import RuleRepository
+    from src.repositories.violation import ViolationRepository
 
 
 class RuleSeverity(str, Enum):
@@ -279,6 +284,77 @@ class ConformanceService:
         self.session = session
         self.capsule_repo = CapsuleRepository(session)
         self._rules: dict[str, RuleDefinition] = {r.rule_id: r for r in ALL_BUILT_IN_RULES}
+        # Lazy-loaded repositories for persistence
+        self._rule_repo: Optional["RuleRepository"] = None
+        self._violation_repo: Optional["ViolationRepository"] = None
+        self._rule_id_cache: dict[str, UUID] = {}  # Maps rule_id str -> DB UUID
+
+    @property
+    def rule_repo(self) -> "RuleRepository":
+        """Lazy-load rule repository."""
+        if self._rule_repo is None:
+            from src.repositories.rule import RuleRepository
+            self._rule_repo = RuleRepository(self.session)
+        return self._rule_repo
+
+    @property
+    def violation_repo(self) -> "ViolationRepository":
+        """Lazy-load violation repository."""
+        if self._violation_repo is None:
+            from src.repositories.violation import ViolationRepository
+            self._violation_repo = ViolationRepository(self.session)
+        return self._violation_repo
+
+    async def sync_rules_to_db(self) -> dict[str, int]:
+        """
+        Sync in-memory rule definitions to the database.
+        Returns counts of created/updated rules.
+        """
+        from src.models.rule import Rule
+        
+        db_rules = []
+        for rule_def in self._rules.values():
+            db_rule = Rule(
+                rule_id=rule_def.rule_id,
+                name=rule_def.name,
+                description=rule_def.description,
+                severity=rule_def.severity.value,
+                category=rule_def.category.value,
+                rule_set=rule_def.rule_set,
+                scope=rule_def.scope.value,
+                definition={
+                    "pattern": rule_def.pattern,
+                    "pattern_type": rule_def.pattern_type,
+                    "condition": rule_def.condition,
+                    "remediation": rule_def.remediation,
+                },
+                enabled=rule_def.enabled,
+                meta={},
+            )
+            db_rules.append(db_rule)
+        
+        result = await self.rule_repo.sync_rules(db_rules)
+        
+        # Update cache with DB UUIDs
+        for rule_def in self._rules.values():
+            db_rule = await self.rule_repo.get_by_rule_id(rule_def.rule_id)
+            if db_rule:
+                self._rule_id_cache[rule_def.rule_id] = db_rule.id
+        
+        return result
+
+    async def _ensure_rules_synced(self) -> None:
+        """Ensure rules are synced to DB and cache is populated."""
+        if not self._rule_id_cache:
+            await self.sync_rules_to_db()
+
+    async def _get_rule_db_id(self, rule_id: str) -> Optional[UUID]:
+        """Get the database UUID for a rule_id string."""
+        if rule_id not in self._rule_id_cache:
+            db_rule = await self.rule_repo.get_by_rule_id(rule_id)
+            if db_rule:
+                self._rule_id_cache[rule_id] = db_rule.id
+        return self._rule_id_cache.get(rule_id)
 
     def get_available_rules(
         self,
@@ -307,8 +383,23 @@ class ConformanceService:
         rule_sets: Optional[list[str]] = None,
         categories: Optional[list[str]] = None,
         capsule_urns: Optional[list[str]] = None,
+        persist_violations: bool = False,
+        ingestion_id: Optional[UUID] = None,
     ) -> ConformanceResult:
-        """Evaluate conformance against rules."""
+        """
+        Evaluate conformance against rules.
+        
+        Args:
+            rule_sets: Optional list of rule sets to evaluate
+            categories: Optional list of categories to filter
+            capsule_urns: Optional list of capsule URNs to evaluate
+            persist_violations: If True, save violations to database
+            ingestion_id: Optional ingestion job ID to associate with violations
+        """
+        # Ensure rules are synced to DB if we need to persist
+        if persist_violations:
+            await self._ensure_rules_synced()
+        
         # Get rules to evaluate
         rules = list(self._rules.values())
         if rule_sets:
@@ -348,6 +439,11 @@ class ConformanceService:
                         rule_results[rule.rule_id][result] += 1
                         if violation:
                             violations.append(violation)
+
+        # Persist violations if requested
+        persisted_violation_ids: set[UUID] = set()
+        if persist_violations and violations:
+            persisted_violation_ids = await self._persist_violations(violations, ingestion_id)
 
         # Calculate scores
         total_pass = sum(r["pass"] for r in rule_results.values())
@@ -401,6 +497,84 @@ class ConformanceService:
             by_category=by_category,
             violations=violations,
         )
+
+    async def _persist_violations(
+        self,
+        violations: list[ViolationInfo],
+        ingestion_id: Optional[UUID] = None,
+    ) -> set[UUID]:
+        """
+        Persist violations to the database.
+        Uses upsert to avoid duplicates for the same rule/subject combo.
+        Returns set of persisted violation IDs.
+        """
+        from src.models.violation import Violation
+        
+        persisted_ids: set[UUID] = set()
+        
+        for v_info in violations:
+            # Get the database UUID for the rule
+            rule_db_id = await self._get_rule_db_id(v_info.rule_id)
+            if not rule_db_id:
+                continue  # Skip if rule not in DB
+            
+            # Determine subject IDs
+            capsule_id = v_info.subject_id if v_info.subject_type == "capsule" else None
+            column_id = v_info.subject_id if v_info.subject_type == "column" else None
+            
+            # For column violations, we also need the capsule_id
+            if v_info.subject_type == "column":
+                # Get the column to find its capsule
+                from src.repositories.column import ColumnRepository
+                column_repo = ColumnRepository(self.session)
+                column = await column_repo.get_by_id(v_info.subject_id)
+                if column:
+                    capsule_id = column.capsule_id
+            
+            violation = Violation(
+                rule_id=rule_db_id,
+                capsule_id=capsule_id,
+                column_id=column_id,
+                severity=v_info.severity.value,
+                message=v_info.message,
+                details=v_info.details,
+                ingestion_id=ingestion_id,
+            )
+            
+            persisted, _ = await self.violation_repo.upsert(violation)
+            persisted_ids.add(persisted.id)
+        
+        return persisted_ids
+
+    async def get_violation_history(
+        self,
+        capsule_id: Optional[UUID] = None,
+        status: Optional[str] = None,
+        severity: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> Sequence["Violation"]:
+        """Get violation history with optional filters."""
+        from src.models.violation import Violation
+        return await self.violation_repo.list_violations(
+            status=status,
+            severity=severity,
+            capsule_id=capsule_id,
+            limit=limit,
+            offset=offset,
+        )
+
+    async def get_violation_summary(self) -> dict[str, Any]:
+        """Get summary statistics about violations."""
+        open_count = await self.violation_repo.count_violations(status="open")
+        by_severity = await self.violation_repo.count_by_severity(status="open")
+        by_category = await self.violation_repo.count_by_category(status="open")
+        
+        return {
+            "open_violations": open_count,
+            "by_severity": by_severity,
+            "by_category": by_category,
+        }
 
     async def _get_all_capsules_with_relations(self) -> Sequence[Capsule]:
         """Get all capsules with columns and lineage loaded."""

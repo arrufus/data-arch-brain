@@ -61,6 +61,12 @@ class Settings(BaseSettings):
     metrics_enabled: bool = True
     metrics_prefix: str = "dab"  # Prometheus metrics prefix
 
+    # Distributed Tracing (OpenTelemetry)
+    tracing_enabled: bool = False  # Enable OpenTelemetry tracing
+    tracing_otlp_endpoint: Optional[str] = None  # OTLP collector endpoint (e.g., "http://localhost:4317")
+    tracing_service_name: str = "data-architecture-brain"
+    tracing_console_export: bool = False  # Enable console export for debugging
+
     # Application
     environment: str = "development"
     log_level: str = "INFO"
@@ -95,6 +101,111 @@ class Settings(BaseSettings):
         if self.is_production:
             return True
         return self.auth_enabled
+
+    def validate_for_startup(self) -> list[str]:
+        """
+        Validate configuration for production readiness.
+        
+        Returns a list of warnings/errors. Empty list means all validations passed.
+        Raises ConfigurationError for critical issues that should prevent startup.
+        """
+        issues: list[str] = []
+        
+        # Critical validations (would prevent startup in production)
+        if self.is_production:
+            # Database URL must be set and not default
+            if "localhost" in self.database_url and "5433" in self.database_url:
+                issues.append(
+                    "CRITICAL: Using default database URL in production. "
+                    "Set DATABASE_URL environment variable."
+                )
+            
+            # API keys must be changed from default
+            if "dev-api-key-change-in-prod" in self.api_keys:
+                issues.append(
+                    "CRITICAL: Using default API key in production. "
+                    "Set API_KEYS environment variable with secure keys."
+                )
+            
+            # Auth must be enabled in production
+            if not self.auth_enabled:
+                issues.append(
+                    "CRITICAL: Authentication is disabled in production. "
+                    "Set AUTH_ENABLED=true."
+                )
+        
+        # Warnings (logged but don't prevent startup)
+        if self.cache_enabled and not self.cache_redis_url:
+            issues.append(
+                "WARNING: Caching enabled but no Redis URL configured. "
+                "Using in-memory cache (not suitable for multi-instance deployments)."
+            )
+        
+        if self.rate_limit_enabled and not self.rate_limit_storage_uri:
+            issues.append(
+                "WARNING: Rate limiting enabled but no storage URI configured. "
+                "Using in-memory storage (not suitable for multi-instance deployments)."
+            )
+        
+        if self.tracing_enabled and not self.tracing_otlp_endpoint:
+            issues.append(
+                "WARNING: Tracing enabled but no OTLP endpoint configured. "
+                "Traces will not be exported unless TRACING_CONSOLE_EXPORT=true."
+            )
+        
+        # Validate database URL format
+        if not self.database_url.startswith(("postgresql", "sqlite")):
+            issues.append(
+                "WARNING: Database URL should start with 'postgresql' or 'sqlite'. "
+                f"Current: {self.database_url[:20]}..."
+            )
+        
+        # Validate CORS origins in production
+        if self.is_production and "*" in self.cors_origins:
+            issues.append(
+                "WARNING: CORS allows all origins (*) in production. "
+                "Consider restricting to specific origins."
+            )
+        
+        return issues
+
+
+class ConfigurationError(Exception):
+    """Raised when configuration validation fails."""
+    
+    def __init__(self, issues: list[str]):
+        self.issues = issues
+        message = "Configuration validation failed:\n" + "\n".join(f"  - {i}" for i in issues)
+        super().__init__(message)
+
+
+def validate_config(settings: Settings, strict: bool = False) -> None:
+    """
+    Validate configuration and log/raise issues.
+    
+    Args:
+        settings: Settings instance to validate
+        strict: If True, raise ConfigurationError on any critical issues
+    
+    Raises:
+        ConfigurationError: If strict=True and critical issues found
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    issues = settings.validate_for_startup()
+    
+    critical_issues = [i for i in issues if i.startswith("CRITICAL")]
+    warnings = [i for i in issues if i.startswith("WARNING")]
+    
+    for warning in warnings:
+        logger.warning(warning.replace("WARNING: ", ""))
+    
+    for critical in critical_issues:
+        logger.error(critical.replace("CRITICAL: ", ""))
+    
+    if strict and critical_issues:
+        raise ConfigurationError(critical_issues)
 
 
 @lru_cache

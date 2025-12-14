@@ -7,7 +7,7 @@ from uuid import UUID
 from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.models.base import DAB_SCHEMA, DABBase, JSONType, URNMixin
+from src.models.base import DABBase, JSONType, URNMixin, fk_ref
 
 if TYPE_CHECKING:
     from src.models.capsule import Capsule
@@ -64,7 +64,7 @@ class Column(DABBase, URNMixin):
 
     # Parent reference
     capsule_id: Mapped[UUID] = mapped_column(
-        ForeignKey(f"{DAB_SCHEMA}.capsules.id", ondelete="CASCADE"),
+        ForeignKey(fk_ref("capsules.id"), ondelete="CASCADE"),
         nullable=False,
         index=True,
     )

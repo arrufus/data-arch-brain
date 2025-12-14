@@ -8,6 +8,7 @@ from src.parsers.base import (
     ParserRegistry,
     RawCapsule,
     RawColumn,
+    RawColumnEdge,
     RawDomain,
     RawEdge,
     RawTag,
