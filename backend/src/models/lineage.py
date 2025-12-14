@@ -8,7 +8,7 @@ from sqlalchemy import DateTime, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database import Base
-from src.models.base import DAB_SCHEMA, JSONType, UUIDType
+from src.models.base import JSONType, UUIDType, fk_ref, get_schema_table_args
 
 if TYPE_CHECKING:
     from src.models.capsule import Capsule
@@ -20,7 +20,7 @@ class CapsuleLineage(Base):
     """Lineage edge between capsules (FLOWS_TO relationship)."""
 
     __tablename__ = "capsule_lineage"
-    __table_args__ = {"schema": DAB_SCHEMA}
+    __table_args__ = get_schema_table_args()
 
     id: Mapped[UUID] = mapped_column(
         UUIDType(),
@@ -34,12 +34,12 @@ class CapsuleLineage(Base):
 
     # Foreign keys for efficient joins
     source_id: Mapped[UUID] = mapped_column(
-        ForeignKey(f"{DAB_SCHEMA}.capsules.id", ondelete="CASCADE"),
+        ForeignKey(fk_ref("capsules.id"), ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     target_id: Mapped[UUID] = mapped_column(
-        ForeignKey(f"{DAB_SCHEMA}.capsules.id", ondelete="CASCADE"),
+        ForeignKey(fk_ref("capsules.id"), ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -56,7 +56,7 @@ class CapsuleLineage(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     ingestion_id: Mapped[Optional[UUID]] = mapped_column(
-        ForeignKey(f"{DAB_SCHEMA}.ingestion_jobs.id"), nullable=True
+        ForeignKey(fk_ref("ingestion_jobs.id")), nullable=True
     )
 
     # Relationships
@@ -75,7 +75,7 @@ class ColumnLineage(Base):
     """Lineage edge between columns (DERIVED_FROM relationship)."""
 
     __tablename__ = "column_lineage"
-    __table_args__ = {"schema": DAB_SCHEMA}
+    __table_args__ = get_schema_table_args()
 
     id: Mapped[UUID] = mapped_column(
         UUIDType(),
@@ -89,12 +89,12 @@ class ColumnLineage(Base):
 
     # Foreign keys
     source_column_id: Mapped[UUID] = mapped_column(
-        ForeignKey(f"{DAB_SCHEMA}.columns.id", ondelete="CASCADE"),
+        ForeignKey(fk_ref("columns.id"), ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     target_column_id: Mapped[UUID] = mapped_column(
-        ForeignKey(f"{DAB_SCHEMA}.columns.id", ondelete="CASCADE"),
+        ForeignKey(fk_ref("columns.id"), ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -108,7 +108,7 @@ class ColumnLineage(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     ingestion_id: Mapped[Optional[UUID]] = mapped_column(
-        ForeignKey(f"{DAB_SCHEMA}.ingestion_jobs.id"), nullable=True
+        ForeignKey(fk_ref("ingestion_jobs.id")), nullable=True
     )
 
     # Relationships

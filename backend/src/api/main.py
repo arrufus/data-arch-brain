@@ -10,10 +10,10 @@ from src.api.auth import APIKeyAuthMiddleware
 from src.api.exceptions import register_exception_handlers
 from src.api.middleware import RequestLoggingMiddleware, SecurityHeadersMiddleware
 from src.api.rate_limit import configure_rate_limiting
-from src.api.routers import capsules, columns, compliance, conformance, domains, health, ingest, reports
+from src.api.routers import capsules, columns, compliance, conformance, domains, health, ingest, reports, violations
 from src.cache import close_cache, init_cache
-from src.config import get_settings
-from src.database import close_db, init_db
+from src.config import get_settings, validate_config
+from src.database import close_db, init_db, engine
 from src.logging_config import configure_logging, get_logger
 from src.metrics import configure_prometheus_metrics
 
@@ -27,15 +27,40 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Startup
     configure_logging()
     logger.info("Starting Data Architecture Brain", environment=settings.environment)
+    
+    # Validate configuration (strict mode in production)
+    validate_config(settings, strict=settings.is_production)
+    logger.info("Configuration validated")
+    
     await init_db()
     logger.info("Database initialized")
     await init_cache()
     logger.info("Cache initialized")
 
+    # Initialize distributed tracing if enabled
+    if settings.tracing_enabled:
+        from src.tracing import setup_tracing
+        setup_tracing(
+            app=app,
+            service_name=settings.tracing_service_name,
+            otlp_endpoint=settings.tracing_otlp_endpoint,
+            enable_console_export=settings.tracing_console_export,
+            engine=engine,
+        )
+        logger.info("Distributed tracing initialized", 
+                   endpoint=settings.tracing_otlp_endpoint)
+
     yield
 
     # Shutdown
     logger.info("Shutting down Data Architecture Brain")
+
+    # Shutdown tracing
+    if settings.tracing_enabled:
+        from src.tracing import shutdown_tracing
+        shutdown_tracing()
+        logger.info("Tracing shutdown complete")
+
     await close_cache()
     logger.info("Cache connections closed")
     await close_db()
@@ -109,6 +134,10 @@ OPENAPI_TAGS = [
         "description": "Architecture conformance - rules, scoring, and violations"
     },
     {
+        "name": "violations",
+        "description": "Conformance violation management - list, acknowledge, resolve"
+    },
+    {
         "name": "domains",
         "description": "Business domain organization and ownership"
     },
@@ -173,6 +202,7 @@ def create_app() -> FastAPI:
     app.include_router(columns.router, prefix=settings.api_prefix, tags=["columns"])
     app.include_router(compliance.router, prefix=settings.api_prefix, tags=["compliance"])
     app.include_router(conformance.router, prefix=settings.api_prefix, tags=["conformance"])
+    app.include_router(violations.router, prefix=settings.api_prefix, tags=["violations"])
     app.include_router(domains.router, prefix=settings.api_prefix, tags=["domains"])
     app.include_router(reports.router, prefix=settings.api_prefix, tags=["reports"])
 

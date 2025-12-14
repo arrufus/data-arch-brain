@@ -6,7 +6,7 @@ from uuid import UUID
 from sqlalchemy import ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.models.base import DAB_SCHEMA, DABBase, JSONType
+from src.models.base import DABBase, JSONType, fk_ref
 
 if TYPE_CHECKING:
     from src.models.capsule import Capsule
@@ -38,10 +38,10 @@ class Domain(DABBase):
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     parent_id: Mapped[Optional[UUID]] = mapped_column(
-        ForeignKey(f"{DAB_SCHEMA}.domains.id"), nullable=True
+        ForeignKey(fk_ref("domains.id")), nullable=True
     )
     owner_id: Mapped[Optional[UUID]] = mapped_column(
-        ForeignKey(f"{DAB_SCHEMA}.owners.id"), nullable=True
+        ForeignKey(fk_ref("owners.id")), nullable=True
     )
     meta: Mapped[dict] = mapped_column(JSONType(), default=dict, nullable=False)
 

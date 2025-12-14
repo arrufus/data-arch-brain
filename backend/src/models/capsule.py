@@ -7,7 +7,7 @@ from uuid import UUID
 from sqlalchemy import Boolean, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.models.base import DAB_SCHEMA, DABBase, MetadataMixin, URNMixin
+from src.models.base import DABBase, MetadataMixin, URNMixin, fk_ref
 
 if TYPE_CHECKING:
     from src.models.column import Column
@@ -52,17 +52,17 @@ class Capsule(DABBase, URNMixin, MetadataMixin):
 
     # Source context
     source_system_id: Mapped[Optional[UUID]] = mapped_column(
-        ForeignKey(f"{DAB_SCHEMA}.source_systems.id"), nullable=True
+        ForeignKey(fk_ref("source_systems.id")), nullable=True
     )
     database_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     schema_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Domain context
     domain_id: Mapped[Optional[UUID]] = mapped_column(
-        ForeignKey(f"{DAB_SCHEMA}.domains.id"), nullable=True
+        ForeignKey(fk_ref("domains.id")), nullable=True
     )
     owner_id: Mapped[Optional[UUID]] = mapped_column(
-        ForeignKey(f"{DAB_SCHEMA}.owners.id"), nullable=True
+        ForeignKey(fk_ref("owners.id")), nullable=True
     )
 
     # Architecture context
@@ -79,7 +79,7 @@ class Capsule(DABBase, URNMixin, MetadataMixin):
 
     # Ingestion tracking
     ingestion_id: Mapped[Optional[UUID]] = mapped_column(
-        ForeignKey(f"{DAB_SCHEMA}.ingestion_jobs.id"), nullable=True
+        ForeignKey(fk_ref("ingestion_jobs.id")), nullable=True
     )
 
     # Relationships

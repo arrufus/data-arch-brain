@@ -111,6 +111,17 @@ class RawEdge:
 
 
 @dataclass
+class RawColumnEdge:
+    """Raw edge data for column-level lineage relationships."""
+
+    source_column_urn: str
+    target_column_urn: str
+    transformation_type: Optional[str] = None  # passthrough, transform, aggregate, etc.
+    transformation_expr: Optional[str] = None  # SQL expression if available
+    meta: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class RawDomain:
     """Raw domain data."""
 
@@ -133,6 +144,7 @@ class ParseResult:
     capsules: list[RawCapsule] = field(default_factory=list)
     columns: list[RawColumn] = field(default_factory=list)
     edges: list[RawEdge] = field(default_factory=list)
+    column_edges: list[RawColumnEdge] = field(default_factory=list)
     domains: list[RawDomain] = field(default_factory=list)
     tags: list[RawTag] = field(default_factory=list)
     errors: list[ParseError] = field(default_factory=list)
@@ -180,6 +192,7 @@ class ParseResult:
             "capsules": len(self.capsules),
             "columns": len(self.columns),
             "edges": len(self.edges),
+            "column_edges": len(self.column_edges),
             "domains": len(self.domains),
             "tags": len(self.tags),
             "warnings": self.warning_count,

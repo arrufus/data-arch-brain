@@ -1,8 +1,14 @@
 """Pytest configuration and fixtures."""
 
 import asyncio
+import os
 from collections.abc import AsyncGenerator, Generator
 from typing import Any
+from unittest.mock import patch
+
+# Set DATABASE_URL before importing any modules that depend on it
+# This ensures SQLite mode is used for models (no schema prefix)
+os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 
 import pytest
 import pytest_asyncio
@@ -10,7 +16,8 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from src.api.main import app
+from src.api.dependencies import get_session
+from src.api.rate_limit import reset_limiter
 from src.config import Settings, get_settings
 from src.database import Base, get_db
 
@@ -28,9 +35,12 @@ def get_test_settings() -> Settings:
         database_url=TEST_DATABASE_URL,
         api_keys=[TEST_API_KEY],
         auth_enabled=False,  # Disable auth for most tests
+        auth_required=False,  # Disable auth middleware
         rate_limit_enabled=False,  # Disable rate limiting for tests
         environment="test",
         log_level="WARNING",
+        metrics_enabled=False,  # Disable metrics for tests
+        tracing_enabled=False,  # Disable tracing for tests
     )
 
 
@@ -40,9 +50,12 @@ def get_test_settings_with_auth() -> Settings:
         database_url=TEST_DATABASE_URL,
         api_keys=[TEST_API_KEY],
         auth_enabled=True,
+        auth_required=True,
         rate_limit_enabled=False,
         environment="test",
         log_level="WARNING",
+        metrics_enabled=False,
+        tracing_enabled=False,
     )
 
 
@@ -106,34 +119,80 @@ async def test_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 
+def _create_test_app():
+    """Create a test FastAPI app with test settings."""
+    import importlib
+
+    # Reset rate limiter to pick up test settings
+    reset_limiter()
+
+    # Patch get_settings before importing create_app
+    with patch("src.api.main.get_settings", get_test_settings):
+        with patch("src.config.get_settings", get_test_settings):
+            with patch("src.api.rate_limit.get_settings", get_test_settings):
+                # Force reimport rate_limit module first to get NoOpLimiter
+                import src.api.rate_limit as rate_limit_module
+                importlib.reload(rate_limit_module)
+                reset_limiter()
+                # Then reload conformance module to use the new limiter
+                import src.api.routers.conformance as conformance_module
+                importlib.reload(conformance_module)
+                # Finally reload main module
+                import src.api.main as main_module
+                importlib.reload(main_module)
+                return main_module.create_app()
+
+
 @pytest_asyncio.fixture(scope="function")
 async def client(test_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """Create test HTTP client without authentication."""
+    # Reset limiter before creating the app to ensure test settings are used
+    reset_limiter()
+
+    # Create a fresh app for each test
+    test_app = _create_test_app()
 
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
         yield test_session
 
-    app.dependency_overrides[get_db] = override_get_db
-    app.dependency_overrides[get_settings] = get_test_settings
+    async def override_get_session() -> AsyncGenerator[AsyncSession, None]:
+        yield test_session
 
-    transport = ASGITransport(app=app)
+    test_app.dependency_overrides[get_db] = override_get_db
+    test_app.dependency_overrides[get_session] = override_get_session
+    test_app.dependency_overrides[get_settings] = get_test_settings
+
+    transport = ASGITransport(app=test_app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
-    app.dependency_overrides.clear()
+    test_app.dependency_overrides.clear()
+    # Reset limiter after test for clean state
+    reset_limiter()
 
 
 @pytest_asyncio.fixture(scope="function")
 async def authenticated_client(test_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """Create test HTTP client with authentication enabled."""
+    # Create a fresh app with auth enabled
+    with patch("src.api.main.get_settings", get_test_settings_with_auth):
+        with patch("src.config.get_settings", get_test_settings_with_auth):
+            import importlib
+            import src.api.main as main_module
+            importlib.reload(main_module)
+            test_app = main_module.create_app()
 
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
         yield test_session
 
-    app.dependency_overrides[get_db] = override_get_db
-    app.dependency_overrides[get_settings] = get_test_settings_with_auth
+    async def override_get_session() -> AsyncGenerator[AsyncSession, None]:
+        yield test_session
 
-    transport = ASGITransport(app=app)
+    test_app.dependency_overrides[get_db] = override_get_db
+    test_app.dependency_overrides[get_session] = override_get_session
+    test_app.dependency_overrides[get_settings] = get_test_settings_with_auth
+
+    transport = ASGITransport(app=test_app)
     async with AsyncClient(
         transport=transport,
         base_url="http://test",
@@ -141,7 +200,7 @@ async def authenticated_client(test_session: AsyncSession) -> AsyncGenerator[Asy
     ) as ac:
         yield ac
 
-    app.dependency_overrides.clear()
+    test_app.dependency_overrides.clear()
 
 
 @pytest.fixture

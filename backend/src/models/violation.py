@@ -8,7 +8,7 @@ from uuid import UUID
 from sqlalchemy import DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.models.base import DAB_SCHEMA, DABBase, JSONType
+from src.models.base import DABBase, JSONType, fk_ref
 
 if TYPE_CHECKING:
     from src.models.capsule import Capsule
@@ -33,19 +33,19 @@ class Violation(DABBase):
 
     # What rule was violated
     rule_id: Mapped[UUID] = mapped_column(
-        ForeignKey(f"{DAB_SCHEMA}.rules.id", ondelete="CASCADE"),
+        ForeignKey(fk_ref("rules.id"), ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
 
     # What violated it (one of these)
     capsule_id: Mapped[Optional[UUID]] = mapped_column(
-        ForeignKey(f"{DAB_SCHEMA}.capsules.id", ondelete="CASCADE"),
+        ForeignKey(fk_ref("capsules.id"), ondelete="CASCADE"),
         nullable=True,
         index=True,
     )
     column_id: Mapped[Optional[UUID]] = mapped_column(
-        ForeignKey(f"{DAB_SCHEMA}.columns.id", ondelete="CASCADE"),
+        ForeignKey(fk_ref("columns.id"), ondelete="CASCADE"),
         nullable=True,
     )
 
@@ -68,7 +68,7 @@ class Violation(DABBase):
         DateTime(timezone=True), server_default="now()", nullable=False
     )
     ingestion_id: Mapped[Optional[UUID]] = mapped_column(
-        ForeignKey(f"{DAB_SCHEMA}.ingestion_jobs.id"), nullable=True
+        ForeignKey(fk_ref("ingestion_jobs.id")), nullable=True
     )
 
     # Relationships

@@ -67,16 +67,48 @@ def create_limiter(settings: Optional[Settings] = None) -> Limiter:
 _limiter: Optional[Limiter] = None
 
 
+class NoOpLimiter:
+    """A no-op limiter that doesn't actually limit anything.
+
+    Used when rate limiting is disabled.
+    """
+
+    def limit(self, limit_string: str = "", **kwargs):
+        """Return a no-op decorator."""
+        def decorator(func):
+            return func
+        return decorator
+
+    def shared_limit(self, *args, **kwargs):
+        """Return a no-op decorator."""
+        def decorator(func):
+            return func
+        return decorator
+
+
 def get_limiter() -> Limiter:
     """Get the global limiter instance.
 
     Returns:
-        The configured Limiter instance
+        The configured Limiter instance (or NoOpLimiter if disabled)
     """
     global _limiter
     if _limiter is None:
-        _limiter = create_limiter()
+        settings = get_settings()
+        if not settings.rate_limit_enabled:
+            _limiter = NoOpLimiter()
+        else:
+            _limiter = create_limiter()
     return _limiter
+
+
+def reset_limiter() -> None:
+    """Reset the global limiter instance.
+
+    Used primarily for testing to allow re-initialization with new settings.
+    """
+    global _limiter
+    _limiter = None
 
 
 def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> Response:

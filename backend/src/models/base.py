@@ -133,12 +133,37 @@ class MetadataMixin:
     )
 
 
-# Schema name for all DAB tables
-DAB_SCHEMA = "dab"
+import os
+
+# Schema name for all DAB tables - disabled for SQLite (tests)
+# Use None for SQLite (no schema support) or "dab" for PostgreSQL
+_db_url = os.environ.get("DATABASE_URL", "")
+DAB_SCHEMA: str | None = None if "sqlite" in _db_url else "dab"
+
+
+def get_schema_table_args() -> dict:
+    """Get table args with schema if not SQLite."""
+    if DAB_SCHEMA:
+        return {"schema": DAB_SCHEMA}
+    return {}
+
+
+def fk_ref(table_column: str) -> str:
+    """Get a foreign key reference with schema prefix if applicable.
+
+    Args:
+        table_column: The table.column reference (e.g., "capsules.id")
+
+    Returns:
+        Schema-prefixed reference for PostgreSQL, or just table.column for SQLite.
+    """
+    if DAB_SCHEMA:
+        return f"{DAB_SCHEMA}.{table_column}"
+    return table_column
 
 
 class DABBase(Base, UUIDMixin, TimestampMixin):
     """Base class for all DAB models with common columns."""
 
     __abstract__ = True
-    __table_args__ = {"schema": DAB_SCHEMA}
+    __table_args__ = get_schema_table_args()

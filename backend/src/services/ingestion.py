@@ -12,11 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.capsule import Capsule
 from src.models.column import Column
 from src.models.ingestion import IngestionJob, IngestionStatus
-from src.models.lineage import CapsuleLineage
+from src.models.lineage import CapsuleLineage, ColumnLineage
 from src.parsers import DbtParser, ParseResult, get_parser
 from src.repositories import (
     CapsuleLineageRepository,
     CapsuleRepository,
+    ColumnLineageRepository,
     ColumnRepository,
     DomainRepository,
     IngestionJobRepository,
@@ -27,16 +28,31 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class ProcessedUrns:
+    """URNs processed during ingestion for orphan detection."""
+    capsule_urns: set[str] = field(default_factory=set)
+    column_urns: set[str] = field(default_factory=set)
+    edge_keys: set[tuple[str, str]] = field(default_factory=set)  # (source_urn, target_urn)
+    column_edge_keys: set[tuple[str, str]] = field(default_factory=set)  # (source_col_urn, target_col_urn)
+
+
+@dataclass
 class IngestionStats:
     """Statistics from an ingestion run."""
 
     capsules_created: int = 0
     capsules_updated: int = 0
     capsules_unchanged: int = 0
+    capsules_deleted: int = 0
     columns_created: int = 0
     columns_updated: int = 0
+    columns_deleted: int = 0
     edges_created: int = 0
     edges_updated: int = 0
+    edges_deleted: int = 0
+    column_edges_created: int = 0
+    column_edges_updated: int = 0
+    column_edges_deleted: int = 0
     domains_created: int = 0
     pii_columns_detected: int = 0
     warnings: int = 0
@@ -48,14 +64,55 @@ class IngestionStats:
             "capsules_created": self.capsules_created,
             "capsules_updated": self.capsules_updated,
             "capsules_unchanged": self.capsules_unchanged,
+            "capsules_deleted": self.capsules_deleted,
             "columns_created": self.columns_created,
             "columns_updated": self.columns_updated,
+            "columns_deleted": self.columns_deleted,
             "edges_created": self.edges_created,
             "edges_updated": self.edges_updated,
+            "edges_deleted": self.edges_deleted,
+            "column_edges_created": self.column_edges_created,
+            "column_edges_updated": self.column_edges_updated,
+            "column_edges_deleted": self.column_edges_deleted,
             "domains_created": self.domains_created,
             "pii_columns_detected": self.pii_columns_detected,
             "warnings": self.warnings,
             "errors": self.errors,
+        }
+
+    @property
+    def total_changes(self) -> int:
+        """Total number of changes (creates + updates + deletes)."""
+        return (
+            self.capsules_created + self.capsules_updated + self.capsules_deleted +
+            self.columns_created + self.columns_updated + self.columns_deleted +
+            self.edges_created + self.edges_updated + self.edges_deleted +
+            self.column_edges_created + self.column_edges_updated + self.column_edges_deleted
+        )
+
+    def delta_summary(self) -> dict[str, dict[str, int]]:
+        """Get delta summary grouped by entity type."""
+        return {
+            "capsules": {
+                "created": self.capsules_created,
+                "updated": self.capsules_updated,
+                "deleted": self.capsules_deleted,
+            },
+            "columns": {
+                "created": self.columns_created,
+                "updated": self.columns_updated,
+                "deleted": self.columns_deleted,
+            },
+            "edges": {
+                "created": self.edges_created,
+                "updated": self.edges_updated,
+                "deleted": self.edges_deleted,
+            },
+            "column_edges": {
+                "created": self.column_edges_created,
+                "updated": self.column_edges_updated,
+                "deleted": self.column_edges_deleted,
+            },
         }
 
 
@@ -90,6 +147,7 @@ class IngestionService:
         self.capsule_repo = CapsuleRepository(session)
         self.column_repo = ColumnRepository(session)
         self.lineage_repo = CapsuleLineageRepository(session)
+        self.column_lineage_repo = ColumnLineageRepository(session)
         self.domain_repo = DomainRepository(session)
         self.source_system_repo = SourceSystemRepository(session)
 
@@ -98,6 +156,7 @@ class IngestionService:
         manifest_path: str,
         catalog_path: Optional[str] = None,
         project_name: Optional[str] = None,
+        cleanup_orphans: bool = False,
     ) -> IngestionResult:
         """
         Ingest dbt metadata from manifest and catalog files.
@@ -106,6 +165,7 @@ class IngestionService:
             manifest_path: Path to manifest.json
             catalog_path: Optional path to catalog.json
             project_name: Optional project name override
+            cleanup_orphans: If True, delete capsules/columns not in current parse
 
         Returns:
             IngestionResult with job details and statistics
@@ -116,12 +176,13 @@ class IngestionService:
             "project_name": project_name,
         }
 
-        return await self.ingest("dbt", config)
+        return await self.ingest("dbt", config, cleanup_orphans=cleanup_orphans)
 
     async def ingest(
         self,
         source_type: str,
         config: dict[str, Any],
+        cleanup_orphans: bool = False,
     ) -> IngestionResult:
         """
         Ingest metadata from any supported source.
@@ -129,6 +190,7 @@ class IngestionService:
         Args:
             source_type: Type of source (e.g., "dbt")
             config: Parser-specific configuration
+            cleanup_orphans: If True, delete capsules/columns from same source not in current parse
 
         Returns:
             IngestionResult with job details and statistics
@@ -180,13 +242,21 @@ class IngestionService:
                 source_type=source_type,
             )
 
-            # Persist parsed data
-            await self._persist_parse_result(
+            # Persist parsed data (returns sets of URNs that were processed)
+            processed_urns = await self._persist_parse_result(
                 parse_result=parse_result,
                 job=job,
                 source_system_id=source_system.id,
                 stats=stats,
             )
+
+            # Cleanup orphans if requested
+            if cleanup_orphans:
+                await self._cleanup_orphans(
+                    source_system_id=source_system.id,
+                    processed_urns=processed_urns,
+                    stats=stats,
+                )
 
             # Complete job
             await self.job_repo.complete_job(job, stats.to_dict())
@@ -197,8 +267,8 @@ class IngestionService:
 
             logger.info(
                 f"Ingestion completed: {stats.capsules_created} capsules created, "
-                f"{stats.capsules_updated} updated, {stats.columns_created} columns, "
-                f"{stats.edges_created} edges"
+                f"{stats.capsules_updated} updated, {stats.capsules_deleted} deleted, "
+                f"{stats.columns_created} columns, {stats.edges_created} edges"
             )
 
         except Exception as e:
@@ -220,10 +290,14 @@ class IngestionService:
         job: IngestionJob,
         source_system_id: UUID,
         stats: IngestionStats,
-    ) -> None:
-        """Persist parsed metadata to database."""
+    ) -> ProcessedUrns:
+        """Persist parsed metadata to database. Returns URNs that were processed."""
+        processed = ProcessedUrns()
+        
         # Build URN to capsule mapping for lineage
         urn_to_capsule: dict[str, Capsule] = {}
+        # Build URN to column mapping for column lineage
+        urn_to_column: dict[str, Column] = {}
 
         # Create/update domains first
         domain_map: dict[str, UUID] = {}
@@ -266,6 +340,7 @@ class IngestionService:
 
             persisted_capsule, created = await self.capsule_repo.upsert_by_urn(capsule)
             urn_to_capsule[raw_capsule.urn] = persisted_capsule
+            processed.capsule_urns.add(raw_capsule.urn)
 
             if created:
                 stats.capsules_created += 1
@@ -301,7 +376,10 @@ class IngestionService:
                 test_count=raw_column.test_count,
             )
 
-            _, created = await self.column_repo.upsert_by_urn(column)
+            persisted_column, created = await self.column_repo.upsert_by_urn(column)
+            # Track the column for column lineage lookup
+            urn_to_column[raw_column.urn] = persisted_column
+            processed.column_urns.add(raw_column.urn)
 
             if created:
                 stats.columns_created += 1
@@ -339,13 +417,118 @@ class IngestionService:
             )
 
             _, created = await self.lineage_repo.upsert(edge)
+            processed.edge_keys.add((raw_edge.source_urn, raw_edge.target_urn))
 
             if created:
                 stats.edges_created += 1
             else:
                 stats.edges_updated += 1
 
+        # Create column lineage edges
+        for raw_col_edge in parse_result.column_edges:
+            source_column = urn_to_column.get(raw_col_edge.source_column_urn)
+            target_column = urn_to_column.get(raw_col_edge.target_column_urn)
+
+            if not source_column:
+                source_column = await self.column_repo.get_by_urn(raw_col_edge.source_column_urn)
+                if source_column:
+                    urn_to_column[source_column.urn] = source_column
+            if not target_column:
+                target_column = await self.column_repo.get_by_urn(raw_col_edge.target_column_urn)
+                if target_column:
+                    urn_to_column[target_column.urn] = target_column
+
+            if not source_column or not target_column:
+                logger.debug(
+                    f"Could not create column edge: {raw_col_edge.source_column_urn} -> {raw_col_edge.target_column_urn}"
+                )
+                continue
+
+            col_edge = ColumnLineage(
+                source_urn=raw_col_edge.source_column_urn,
+                target_urn=raw_col_edge.target_column_urn,
+                source_column_id=source_column.id,
+                target_column_id=target_column.id,
+                transformation_type=raw_col_edge.transformation_type,
+                transformation_expr=raw_col_edge.transformation_expr,
+                ingestion_id=job.id,
+            )
+
+            _, created = await self.column_lineage_repo.upsert(col_edge)
+            processed.column_edge_keys.add(
+                (raw_col_edge.source_column_urn, raw_col_edge.target_column_urn)
+            )
+
+            if created:
+                stats.column_edges_created += 1
+            else:
+                stats.column_edges_updated += 1
+
         # Flush all changes
+        await self.session.flush()
+        
+        return processed
+
+    async def _cleanup_orphans(
+        self,
+        source_system_id: UUID,
+        processed_urns: ProcessedUrns,
+        stats: IngestionStats,
+    ) -> None:
+        """
+        Remove capsules, columns, and edges that were not in the current parse.
+        Only removes entities from the same source system.
+        """
+        from sqlalchemy import and_, delete, select
+        
+        # Get existing capsules from this source system
+        existing_capsules = await self.capsule_repo.get_by_source_system(source_system_id)
+        
+        # Find orphaned capsules (in DB but not in current parse)
+        orphan_capsule_ids: list[UUID] = []
+        for capsule in existing_capsules:
+            if capsule.urn not in processed_urns.capsule_urns:
+                orphan_capsule_ids.append(capsule.id)
+        
+        # Delete orphaned capsules (this will cascade to columns and edges)
+        if orphan_capsule_ids:
+            for capsule_id in orphan_capsule_ids:
+                # Delete associated lineage edges first
+                deleted_edges = await self.lineage_repo.delete_edges_for_capsule(capsule_id)
+                stats.edges_deleted += deleted_edges
+                
+                # Delete associated columns
+                columns = await self.column_repo.get_by_capsule_id(capsule_id)
+                for col in columns:
+                    await self.session.delete(col)
+                    stats.columns_deleted += 1
+                
+                # Delete capsule
+                capsule = await self.capsule_repo.get_by_id(capsule_id)
+                if capsule:
+                    await self.session.delete(capsule)
+                    stats.capsules_deleted += 1
+            
+            logger.info(f"Cleaned up {stats.capsules_deleted} orphaned capsules")
+        
+        # For edges not attached to orphaned capsules, check individual edge orphans
+        # Get all edges from this source system
+        all_edges_stmt = select(CapsuleLineage).join(
+            Capsule, CapsuleLineage.source_id == Capsule.id
+        ).where(Capsule.source_system_id == source_system_id)
+        result = await self.session.execute(all_edges_stmt)
+        all_edges = result.scalars().all()
+        
+        orphan_edges = []
+        for edge in all_edges:
+            edge_key = (edge.source_urn, edge.target_urn)
+            if edge_key not in processed_urns.edge_keys:
+                orphan_edges.append(edge)
+        
+        for edge in orphan_edges:
+            await self.session.delete(edge)
+            stats.edges_deleted += 1
+        
         await self.session.flush()
 
     async def get_job_status(self, job_id: UUID) -> Optional[IngestionJob]:
