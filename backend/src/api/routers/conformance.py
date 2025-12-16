@@ -4,7 +4,7 @@ import io
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, Request, UploadFile, File
+from fastapi import APIRouter, Depends, Query, Request, Response, UploadFile, File
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -103,6 +103,7 @@ class EvaluateResponse(BaseModel):
 @limiter.limit("10/minute")
 async def get_conformance_score(
     request: Request,
+    response: Response,
     scope: str = Query("global", pattern="^(global|domain|capsule)$"),
     domain: Optional[str] = Query(None, description="Domain name (if scope=domain)"),
     capsule_urn: Optional[str] = Query(None, description="Capsule URN (if scope=capsule)"),
@@ -202,6 +203,7 @@ async def list_violations(
 @limiter.limit("5/minute")
 async def run_conformance_check(
     request: Request,
+    response: Response,
     body: EvaluateRequest,
     session: AsyncSession = Depends(get_session),
 ) -> EvaluateResponse:

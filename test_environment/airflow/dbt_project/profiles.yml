@@ -1,0 +1,24 @@
+customer_analytics:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('BRONZE_DB_HOST', 'localhost') }}"
+      port: "{{ env_var('BRONZE_DB_PORT', '5433') | int }}"
+      user: "{{ env_var('BRONZE_DB_USER', 'postgres') }}"
+      password: "{{ env_var('BRONZE_DB_PASSWORD', 'postgres') }}"
+      dbname: bronze_db
+      schema: bronze
+      threads: 4
+      keepalives_idle: 0
+
+    prod:
+      type: postgres
+      host: "{{ env_var('BRONZE_DB_HOST', 'postgres-data') }}"
+      port: "{{ env_var('BRONZE_DB_PORT', '5432') | int }}"
+      user: "{{ env_var('BRONZE_DB_USER', 'postgres') }}"
+      password: "{{ env_var('BRONZE_DB_PASSWORD', 'postgres') }}"
+      dbname: bronze_db
+      schema: bronze
+      threads: 4
+      keepalives_idle: 0

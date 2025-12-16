@@ -74,12 +74,31 @@ class IngestionJobRepository(BaseRepository[IngestionJob]):
         source_name: Optional[str] = None,
         config: Optional[dict] = None,
     ) -> IngestionJob:
-        """Create a new running ingestion job."""
+        """
+        Create a new running ingestion job.
+
+        The config is automatically redacted to remove sensitive information
+        (passwords, tokens, API keys, etc.) before persistence.
+
+        Args:
+            source_type: Type of source (e.g., "dbt", "airflow")
+            source_name: Optional name of the source
+            config: Configuration dictionary (will be redacted before storage)
+
+        Returns:
+            Created IngestionJob with redacted config
+        """
+        # Import here to avoid circular dependency
+        from src.services.secret_redaction import redact_config
+
+        # Redact sensitive information from config before persisting
+        safe_config = redact_config(config or {})
+
         job = IngestionJob(
             source_type=source_type,
             source_name=source_name,
             status=IngestionStatus.RUNNING.value,
-            config=config or {},
+            config=safe_config,
         )
         self.session.add(job)
         await self.session.flush()

@@ -178,6 +178,54 @@ class IngestionService:
 
         return await self.ingest("dbt", config, cleanup_orphans=cleanup_orphans)
 
+    async def ingest_airflow(
+        self,
+        base_url: str,
+        instance_name: Optional[str] = None,
+        auth_mode: str = "none",
+        dag_id_allowlist: Optional[list[str]] = None,
+        dag_id_denylist: Optional[list[str]] = None,
+        dag_id_regex: Optional[str] = None,
+        include_paused: bool = False,
+        include_inactive: bool = False,
+        cleanup_orphans: bool = False,
+        **kwargs: Any,
+    ) -> IngestionResult:
+        """
+        Ingest Airflow DAG and task metadata from REST API.
+
+        Args:
+            base_url: Airflow instance base URL (e.g., "https://airflow.example.com")
+            instance_name: Optional instance name for URN construction
+            auth_mode: Authentication mode ("none", "bearer_env", "basic_env")
+            dag_id_allowlist: Optional list of DAG IDs to include
+            dag_id_denylist: Optional list of DAG IDs to exclude
+            dag_id_regex: Optional regex pattern for DAG ID filtering
+            include_paused: Whether to include paused DAGs
+            include_inactive: Whether to include inactive DAGs
+            cleanup_orphans: If True, delete capsules/edges not in current parse
+            **kwargs: Additional configuration options (e.g., token_env, page_limit)
+
+        Returns:
+            IngestionResult with job details and statistics
+        """
+        config = {
+            "base_url": base_url,
+            "instance_name": instance_name,
+            "auth_mode": auth_mode,
+            "dag_id_allowlist": dag_id_allowlist,
+            "dag_id_denylist": dag_id_denylist,
+            "dag_id_regex": dag_id_regex,
+            "include_paused": include_paused,
+            "include_inactive": include_inactive,
+            **kwargs,
+        }
+
+        # Remove None values
+        config = {k: v for k, v in config.items() if v is not None}
+
+        return await self.ingest("airflow", config, cleanup_orphans=cleanup_orphans)
+
     async def ingest(
         self,
         source_type: str,

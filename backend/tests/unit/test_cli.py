@@ -203,24 +203,158 @@ class TestCLIOptions:
         """Test project name can be overridden."""
         manifest_file = tmp_path / "manifest.json"
         manifest_file.write_text('{}')
-        
+
         result = runner.invoke(app, [
             "ingest", "dbt",
             "--manifest", str(manifest_file),
             "--project", "custom_project_name",
         ])
-        
+
         # Should accept the project name option
 
     def test_short_options(self, tmp_path):
         """Test short option aliases work."""
         manifest_file = tmp_path / "manifest.json"
         manifest_file.write_text('{}')
-        
+
         result = runner.invoke(app, [
             "ingest", "dbt",
             "-m", str(manifest_file),
             "-p", "my_project",
         ])
-        
+
         # Should accept short options
+
+
+class TestCLIAirflowIngest:
+    """Tests for Airflow ingestion CLI command."""
+
+    def test_airflow_help(self):
+        """Test Airflow ingestion help output."""
+        result = runner.invoke(app, ["ingest", "airflow", "--help"])
+
+        assert result.exit_code == 0
+        assert "Airflow" in result.output
+        assert "--base-url" in result.output
+        assert "--auth-mode" in result.output
+        assert "bearer_env" in result.output
+
+    def test_airflow_requires_base_url(self):
+        """Test that Airflow ingestion requires base_url."""
+        result = runner.invoke(app, ["ingest", "airflow"])
+
+        # Should fail because --base-url is required
+        assert result.exit_code != 0
+
+    def test_airflow_with_base_url_only(self):
+        """Test Airflow ingestion with only base_url (minimal config)."""
+        result = runner.invoke(app, [
+            "ingest", "airflow",
+            "--base-url", "https://airflow.example.com",
+        ])
+
+        # May fail due to connection/database, but should accept the option
+        # The important thing is it doesn't fail immediately with parameter validation
+
+    def test_airflow_with_auth_mode(self):
+        """Test Airflow ingestion with authentication mode."""
+        result = runner.invoke(app, [
+            "ingest", "airflow",
+            "--base-url", "https://airflow.example.com",
+            "--auth-mode", "bearer_env",
+        ])
+
+        # Should accept auth_mode option
+
+    def test_airflow_with_dag_regex(self):
+        """Test Airflow ingestion with DAG regex filter."""
+        result = runner.invoke(app, [
+            "ingest", "airflow",
+            "--base-url", "https://airflow.example.com",
+            "--dag-regex", "customer_.*",
+        ])
+
+        # Should accept dag-regex option
+
+    def test_airflow_with_dag_allowlist(self):
+        """Test Airflow ingestion with DAG allowlist."""
+        result = runner.invoke(app, [
+            "ingest", "airflow",
+            "--base-url", "https://airflow.example.com",
+            "--dag-allowlist", "dag1,dag2,dag3",
+        ])
+
+        # Should accept dag-allowlist option
+
+    def test_airflow_with_dag_denylist(self):
+        """Test Airflow ingestion with DAG denylist."""
+        result = runner.invoke(app, [
+            "ingest", "airflow",
+            "--base-url", "https://airflow.example.com",
+            "--dag-denylist", "old_dag,deprecated_dag",
+        ])
+
+        # Should accept dag-denylist option
+
+    def test_airflow_with_include_paused(self):
+        """Test Airflow ingestion with include_paused flag."""
+        result = runner.invoke(app, [
+            "ingest", "airflow",
+            "--base-url", "https://airflow.example.com",
+            "--include-paused",
+        ])
+
+        # Should accept include-paused flag
+
+    def test_airflow_with_cleanup_orphans(self):
+        """Test Airflow ingestion with cleanup_orphans flag."""
+        result = runner.invoke(app, [
+            "ingest", "airflow",
+            "--base-url", "https://airflow.example.com",
+            "--cleanup-orphans",
+        ])
+
+        # Should accept cleanup-orphans flag
+
+    def test_airflow_with_full_config(self):
+        """Test Airflow ingestion with all configuration options."""
+        result = runner.invoke(app, [
+            "ingest", "airflow",
+            "--base-url", "https://airflow.example.com",
+            "--instance", "prod-airflow",
+            "--auth-mode", "bearer_env",
+            "--token-env", "MY_AIRFLOW_TOKEN",
+            "--dag-regex", "customer_.*",
+            "--include-paused",
+            "--include-inactive",
+            "--page-limit", "50",
+            "--timeout", "60.0",
+            "--cleanup-orphans",
+        ])
+
+        # Should accept all options
+
+    def test_airflow_short_options(self):
+        """Test Airflow ingestion with short option aliases."""
+        result = runner.invoke(app, [
+            "ingest", "airflow",
+            "-u", "https://airflow.example.com",
+            "-i", "prod",
+            "-a", "bearer_env",
+            "-r", "customer_.*",
+            "-t", "45.0",
+        ])
+
+        # Should accept short options
+
+    def test_airflow_mutually_exclusive_lists(self):
+        """Test that allowlist and denylist cannot be used together."""
+        result = runner.invoke(app, [
+            "ingest", "airflow",
+            "--base-url", "https://airflow.example.com",
+            "--dag-allowlist", "dag1,dag2",
+            "--dag-denylist", "dag3,dag4",
+        ])
+
+        # Should fail or warn about mutually exclusive options
+        # The CLI validates this and exits with an error

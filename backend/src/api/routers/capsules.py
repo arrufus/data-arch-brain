@@ -5,6 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
+from sqlalchemy import text
 
 from src.api.exceptions import NotFoundError, ValidationError_
 from src.database import DbSession
@@ -182,14 +183,51 @@ async def get_capsule_stats(db: DbSession) -> dict:
     by_type = await repo.count_by_type()
     total = await repo.count()
 
-    # Get PII stats
-    pii_capsules = await repo.get_with_pii(limit=1)
-    # This is a rough count - ideally we'd have a dedicated count method
+    # Get PII stats - count capsules with at least one PII column
+    result = await db.execute(
+        text("""
+        SELECT COUNT(DISTINCT c.id) as capsules_with_pii
+        FROM capsules c
+        INNER JOIN columns col ON col.capsule_id = c.id
+        WHERE col.pii_type IS NOT NULL
+        """)
+    )
+    capsules_with_pii = result.scalar() or 0
+
+    # Get documentation stats
+    result = await db.execute(
+        text("""
+        SELECT COUNT(*) as capsules_with_docs
+        FROM capsules
+        WHERE description IS NOT NULL AND description != ''
+        """)
+    )
+    capsules_with_docs = result.scalar() or 0
+
+    # Get average column count
+    result = await db.execute(
+        text("""
+        SELECT AVG(col_count) as avg_columns
+        FROM (
+            SELECT COUNT(*) as col_count
+            FROM columns
+            GROUP BY capsule_id
+        ) subq
+        """)
+    )
+    average_column_count = float(result.scalar() or 0)
+
+    # Get average doc coverage (percentage of capsules with descriptions)
+    average_doc_coverage = (capsules_with_docs / total * 100) if total > 0 else 0
 
     return {
         "total_capsules": total,
         "by_layer": by_layer,
         "by_type": by_type,
+        "capsules_with_pii": capsules_with_pii,
+        "capsules_with_docs": capsules_with_docs,
+        "average_column_count": round(average_column_count, 1),
+        "average_doc_coverage": round(average_doc_coverage, 1),
     }
 
 
@@ -205,9 +243,9 @@ async def get_capsule(
     if not capsule:
         raise NotFoundError("Capsule", urn)
 
-    # Get upstream/downstream counts
-    upstream = await repo.get_upstream(capsule.id, depth=1)
-    downstream = await repo.get_downstream(capsule.id, depth=1)
+    # Get upstream/downstream counts (using depth=3 to match lineage tab default)
+    upstream = await repo.get_upstream(capsule.id, depth=3)
+    downstream = await repo.get_downstream(capsule.id, depth=3)
 
     return CapsuleDetail(
         id=str(capsule.id),

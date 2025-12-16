@@ -1,0 +1,119 @@
+version: 2
+
+sources:
+  - name: bronze
+    description: Bronze layer source data
+    database: bronze_db
+    schema: bronze
+
+    tables:
+      - name: customers
+        description: Raw customer data from the source system
+        meta:
+          owner: data_engineering
+          data_domain: customer
+        columns:
+          - name: customer_id
+            description: Unique customer identifier
+            tests:
+              - unique
+              - not_null
+          - name: first_name
+            description: Customer first name
+          - name: last_name
+            description: Customer last name
+          - name: email
+            description: Customer email address
+            meta:
+              pii: true
+              pii_type: email
+              sensitivity: high
+            tests:
+              - not_null
+          - name: phone
+            description: Customer phone number
+            meta:
+              pii: true
+              pii_type: phone
+          - name: address
+            description: Street address
+            meta:
+              pii: true
+              pii_type: address
+          - name: city
+            description: City
+          - name: state
+            description: State/Province
+          - name: zip_code
+            description: Postal code
+          - name: country_code
+            description: ISO country code
+          - name: created_at
+            description: Record creation timestamp
+          - name: updated_at
+            description: Record last update timestamp
+
+      - name: orders
+        description: Raw order data
+        meta:
+          owner: data_engineering
+          data_domain: sales
+        columns:
+          - name: order_id
+            description: Unique order identifier
+            tests:
+              - unique
+              - not_null
+          - name: customer_id
+            description: Foreign key to customers
+            tests:
+              - not_null
+              - relationships:
+                  to: source('bronze', 'customers')
+                  field: customer_id
+          - name: order_date
+            description: Date the order was placed
+            tests:
+              - not_null
+          - name: order_amount
+            description: Total order amount
+          - name: status
+            description: Order status
+          - name: payment_method
+            description: Payment method used
+          - name: shipping_address
+            description: Shipping address
+            meta:
+              pii: true
+              pii_type: address
+          - name: created_at
+            description: Record creation timestamp
+
+      - name: order_items
+        description: Raw order line items
+        meta:
+          owner: data_engineering
+          data_domain: sales
+        columns:
+          - name: order_item_id
+            description: Unique order item identifier
+            tests:
+              - unique
+              - not_null
+          - name: order_id
+            description: Foreign key to orders
+            tests:
+              - not_null
+              - relationships:
+                  to: source('bronze', 'orders')
+                  field: order_id
+          - name: product_id
+            description: Product identifier
+          - name: product_name
+            description: Product name
+          - name: quantity
+            description: Quantity ordered
+          - name: unit_price
+            description: Price per unit
+          - name: total_price
+            description: Total line item price

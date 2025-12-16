@@ -22,10 +22,13 @@ from src.parsers.dbt_config import (
     LAYER_TAGS,
 )
 from src.parsers.dbt_parser import DbtParser
+from src.parsers.airflow_config import AirflowParserConfig
+from src.parsers.airflow_parser import AirflowParser
 
 # Create and populate the default parser registry
 default_registry = ParserRegistry()
 default_registry.register("dbt", DbtParser)
+default_registry.register("airflow", AirflowParser)
 
 
 def get_parser(source_type: str) -> MetadataParser:
@@ -59,6 +62,9 @@ __all__ = [
     "DEFAULT_LAYER_PATTERNS",
     "DEFAULT_PII_PATTERNS",
     "LAYER_TAGS",
+    # Airflow parser
+    "AirflowParser",
+    "AirflowParserConfig",
     # Registry functions
     "default_registry",
     "get_parser",
