@@ -8,9 +8,11 @@ from uuid import uuid4
 from src.services.ingestion import (
     IngestionService,
     IngestionStats,
+    IngestionResult,
     ProcessedUrns,
 )
 from src.models.ingestion import IngestionStatus
+from src.parsers.base import ParseResult, RawCapsule, RawEdge
 
 
 class TestIngestionStats:
@@ -363,3 +365,226 @@ class TestURNGeneration:
         urns.add("urn:dab:dbt:model:proj.schema:table1")  # Duplicate
         
         assert len(urns) == 2  # Duplicates should be ignored
+
+
+class TestAirflowIngestion:
+    """Tests for Airflow ingestion via IngestionService."""
+
+    @pytest.mark.asyncio
+    async def test_ingest_airflow_creates_correct_config(self):
+        """Test that ingest_airflow builds correct configuration."""
+        mock_session = AsyncMock()
+        service = IngestionService(mock_session)
+
+        # Mock the generic ingest method
+        service.ingest = AsyncMock(return_value=IngestionResult(
+            job_id=uuid4(),
+            status=IngestionStatus.COMPLETED,
+            source_type="airflow",
+            source_name="test-airflow",
+        ))
+
+        # Call ingest_airflow
+        result = await service.ingest_airflow(
+            base_url="https://airflow.example.com",
+            instance_name="test-airflow",
+            auth_mode="bearer_env",
+            dag_id_regex="customer_.*",
+            include_paused=True,
+            cleanup_orphans=True,
+        )
+
+        # Verify ingest was called with correct config
+        service.ingest.assert_called_once()
+        call_args = service.ingest.call_args
+        
+        assert call_args[0][0] == "airflow"  # source_type
+        config = call_args[0][1]  # config dict
+        assert config["base_url"] == "https://airflow.example.com"
+        assert config["instance_name"] == "test-airflow"
+        assert config["auth_mode"] == "bearer_env"
+        assert config["dag_id_regex"] == "customer_.*"
+        assert config["include_paused"] is True
+        assert call_args[1]["cleanup_orphans"] is True
+
+    @pytest.mark.asyncio
+    async def test_ingest_airflow_removes_none_values(self):
+        """Test that ingest_airflow removes None values from config."""
+        mock_session = AsyncMock()
+        service = IngestionService(mock_session)
+
+        service.ingest = AsyncMock(return_value=IngestionResult(
+            job_id=uuid4(),
+            status=IngestionStatus.COMPLETED,
+            source_type="airflow",
+        ))
+
+        # Call with minimal parameters (many None values)
+        await service.ingest_airflow(
+            base_url="https://airflow.example.com",
+        )
+
+        call_args = service.ingest.call_args
+        config = call_args[0][1]
+
+        # None values should be removed
+        assert "base_url" in config
+        assert "instance_name" not in config  # None was removed
+        assert "dag_id_allowlist" not in config  # None was removed
+        assert "dag_id_denylist" not in config  # None was removed
+
+    @pytest.mark.asyncio
+    async def test_ingest_airflow_with_kwargs(self):
+        """Test that ingest_airflow accepts additional kwargs."""
+        mock_session = AsyncMock()
+        service = IngestionService(mock_session)
+
+        service.ingest = AsyncMock(return_value=IngestionResult(
+            job_id=uuid4(),
+            status=IngestionStatus.COMPLETED,
+            source_type="airflow",
+        ))
+
+        # Call with extra kwargs
+        await service.ingest_airflow(
+            base_url="https://airflow.example.com",
+            token_env="MY_CUSTOM_TOKEN",
+            page_limit=50,
+            timeout_seconds=60.0,
+        )
+
+        call_args = service.ingest.call_args
+        config = call_args[0][1]
+
+        assert config["token_env"] == "MY_CUSTOM_TOKEN"
+        assert config["page_limit"] == 50
+        assert config["timeout_seconds"] == 60.0
+
+    @pytest.mark.asyncio
+    async def test_ingest_with_airflow_source_type(self):
+        """Test generic ingest method works with airflow source type."""
+        mock_session = AsyncMock()
+        
+        # Mock repositories
+        mock_job_repo = AsyncMock()
+        mock_job = MagicMock()
+        mock_job.id = uuid4()
+        mock_job.started_at = datetime.now()
+        mock_job.source_name = None
+        mock_job_repo.start_job.return_value = mock_job
+        mock_job_repo.complete_job = AsyncMock()
+
+        mock_source_system_repo = AsyncMock()
+        mock_source_system = MagicMock()
+        mock_source_system.id = uuid4()
+        mock_source_system_repo.get_or_create.return_value = (mock_source_system, True)
+
+        # Mock parser
+        mock_parse_result = ParseResult(
+            source_type="airflow",
+            source_name="test-airflow",
+            source_version="2.7.0",
+            capsules=[
+                RawCapsule(
+                    urn="urn:dab:airflow:dag:test:test_dag",
+                    name="test_dag",
+                    capsule_type="airflow_dag",
+                    unique_id="test:test_dag",
+                ),
+                RawCapsule(
+                    urn="urn:dab:airflow:task:test:test_dag.task1",
+                    name="task1",
+                    capsule_type="airflow_task",
+                    unique_id="test:test_dag.task1",
+                ),
+            ],
+            edges=[
+                RawEdge(
+                    source_urn="urn:dab:airflow:dag:test:test_dag",
+                    target_urn="urn:dab:airflow:task:test:test_dag.task1",
+                    edge_type="contains",
+                ),
+            ],
+        )
+
+        with patch("src.services.ingestion.get_parser") as mock_get_parser:
+            mock_parser = MagicMock()
+            mock_parser.validate_config.return_value = []
+            mock_parser.parse = AsyncMock(return_value=mock_parse_result)
+            mock_get_parser.return_value = mock_parser
+
+            # Create service with mocked repos
+            service = IngestionService(mock_session)
+            service.job_repo = mock_job_repo
+            service.source_system_repo = mock_source_system_repo
+            
+            # Mock _persist_parse_result
+            service._persist_parse_result = AsyncMock(return_value=ProcessedUrns())
+
+            # Call ingest with Airflow config
+            config = {
+                "base_url": "https://airflow.example.com",
+                "instance_name": "test-airflow",
+            }
+            result = await service.ingest("airflow", config, cleanup_orphans=False)
+
+            # Verify parser was called
+            mock_get_parser.assert_called_once_with("airflow")
+            mock_parser.validate_config.assert_called_once_with(config)
+            mock_parser.parse.assert_called_once_with(config)
+
+            # Verify source system was created
+            mock_source_system_repo.get_or_create.assert_called_once()
+
+            # Verify job was completed
+            mock_job_repo.complete_job.assert_called_once()
+
+            # Verify result
+            assert result.status == IngestionStatus.COMPLETED
+            assert result.source_type == "airflow"
+            assert result.source_name == "test-airflow"
+
+    @pytest.mark.asyncio
+    async def test_ingest_airflow_with_cleanup_orphans(self):
+        """Test that cleanup_orphans flag is passed through correctly."""
+        mock_session = AsyncMock()
+        
+        mock_job_repo = AsyncMock()
+        mock_job = MagicMock()
+        mock_job.id = uuid4()
+        mock_job.started_at = datetime.now()
+        mock_job_repo.start_job.return_value = mock_job
+        mock_job_repo.complete_job = AsyncMock()
+
+        mock_source_system_repo = AsyncMock()
+        mock_source_system = MagicMock()
+        mock_source_system.id = uuid4()
+        mock_source_system_repo.get_or_create.return_value = (mock_source_system, True)
+
+        mock_parse_result = ParseResult(
+            source_type="airflow",
+            source_name="test-airflow",
+            capsules=[],
+            edges=[],
+        )
+
+        with patch("src.services.ingestion.get_parser") as mock_get_parser:
+            mock_parser = MagicMock()
+            mock_parser.validate_config.return_value = []
+            mock_parser.parse = AsyncMock(return_value=mock_parse_result)
+            mock_get_parser.return_value = mock_parser
+
+            service = IngestionService(mock_session)
+            service.job_repo = mock_job_repo
+            service.source_system_repo = mock_source_system_repo
+            service._persist_parse_result = AsyncMock(return_value=ProcessedUrns())
+            service._cleanup_orphans = AsyncMock()
+
+            # Call with cleanup_orphans=True
+            config = {"base_url": "https://airflow.example.com"}
+            await service.ingest("airflow", config, cleanup_orphans=True)
+
+            # Verify cleanup was called
+            service._cleanup_orphans.assert_called_once()
+            call_args = service._cleanup_orphans.call_args
+            assert call_args[1]["source_system_id"] == mock_source_system.id

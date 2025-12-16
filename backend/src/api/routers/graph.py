@@ -41,7 +41,7 @@ async def export_graph(
     db: DbSession,
     format: ExportFormat = Query(
         ExportFormat.MERMAID,
-        description="Output format: graphml, dot, cypher, mermaid, json-ld",
+        description="Output format: graphml, dot, cypher, mermaid, json-ld, json",
     ),
     domain_id: Optional[UUID] = Query(
         None,
@@ -69,6 +69,7 @@ async def export_graph(
     - **cypher**: Neo4j Cypher statements for graph database import
     - **mermaid**: Mermaid flowchart syntax for documentation
     - **json-ld**: JSON-LD format for semantic web applications
+    - **json**: Simple JSON format for visualization (React Flow)
 
     Options:
     - Filter by domain to export only a subset of the graph
@@ -95,6 +96,7 @@ async def export_graph(
         ExportFormat.CYPHER: "text/plain",
         ExportFormat.MERMAID: "text/plain",
         ExportFormat.JSON_LD: "application/ld+json",
+        ExportFormat.JSON: "application/json",
     }
 
     file_extensions = {
@@ -103,6 +105,7 @@ async def export_graph(
         ExportFormat.CYPHER: "cypher",
         ExportFormat.MERMAID: "mmd",
         ExportFormat.JSON_LD: "jsonld",
+        ExportFormat.JSON: "json",
     }
 
     return Response(
@@ -120,7 +123,7 @@ async def export_lineage(
     db: DbSession,
     format: ExportFormat = Query(
         ExportFormat.MERMAID,
-        description="Output format: graphml, dot, cypher, mermaid, json-ld",
+        description="Output format: graphml, dot, cypher, mermaid, json-ld, json",
     ),
     depth: int = Query(
         3,
@@ -174,6 +177,7 @@ async def export_lineage(
         ExportFormat.CYPHER: "text/plain",
         ExportFormat.MERMAID: "text/plain",
         ExportFormat.JSON_LD: "application/ld+json",
+        ExportFormat.JSON: "application/json",
     }
 
     file_extensions = {
@@ -182,6 +186,7 @@ async def export_lineage(
         ExportFormat.CYPHER: "cypher",
         ExportFormat.MERMAID: "mmd",
         ExportFormat.JSON_LD: "jsonld",
+        ExportFormat.JSON: "json",
     }
 
     # Use capsule name in filename
@@ -232,6 +237,12 @@ async def list_formats() -> dict:
                 "description": "JSON-LD format for semantic web and linked data",
                 "tools": ["JSON-LD Playground", "Apache Jena", "RDF tools"],
                 "content_type": "application/ld+json",
+            },
+            {
+                "name": "json",
+                "description": "Simple JSON format for web visualization",
+                "tools": ["React Flow", "D3.js", "vis.js", "Cytoscape.js"],
+                "content_type": "application/json",
             },
         ]
     }

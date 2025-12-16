@@ -10,7 +10,7 @@ from src.api.auth import APIKeyAuthMiddleware
 from src.api.exceptions import register_exception_handlers
 from src.api.middleware import RequestLoggingMiddleware, SecurityHeadersMiddleware
 from src.api.rate_limit import configure_rate_limiting
-from src.api.routers import capsules, columns, compliance, conformance, domains, graph, health, ingest, products, reports, tags, violations
+from src.api.routers import capsules, columns, compliance, conformance, domains, graph, health, ingest, products, redundancy, reports, tags, violations
 from src.cache import close_cache, init_cache
 from src.config import get_settings, validate_config
 from src.database import close_db, init_db, engine
@@ -154,6 +154,10 @@ OPENAPI_TAGS = [
         "description": "Graph export - export property graph in GraphML, DOT, Cypher, Mermaid, and JSON-LD formats"
     },
     {
+        "name": "redundancy",
+        "description": "Redundancy detection - find duplicate and overlapping data assets"
+    },
+    {
         "name": "reports",
         "description": "Report generation in various formats (JSON, CSV, HTML)"
     },
@@ -221,6 +225,7 @@ def create_app() -> FastAPI:
     app.include_router(tags.capsule_tags_router, prefix=settings.api_prefix, tags=["tags"])
     app.include_router(tags.column_tags_router, prefix=settings.api_prefix, tags=["tags"])
     app.include_router(graph.router, prefix=settings.api_prefix, tags=["graph"])
+    app.include_router(redundancy.router, prefix=settings.api_prefix, tags=["redundancy"])
     app.include_router(reports.router, prefix=settings.api_prefix, tags=["reports"])
 
     # Register exception handlers

@@ -23,6 +23,30 @@ class DbtIngestRequest(BaseModel):
     project_name: Optional[str] = None
 
 
+class AirflowIngestRequest(BaseModel):
+    """Request body for Airflow ingestion via REST API.
+
+    Authentication credentials should be provided via environment variables
+    referenced in token_env, username_env, and password_env fields.
+    """
+
+    base_url: str
+    instance_name: Optional[str] = None
+    auth_mode: str = "none"
+    token_env: str = "AIRFLOW_TOKEN"
+    username_env: str = "AIRFLOW_USERNAME"
+    password_env: str = "AIRFLOW_PASSWORD"
+    dag_id_allowlist: Optional[list[str]] = None
+    dag_id_denylist: Optional[list[str]] = None
+    dag_id_regex: Optional[str] = None
+    include_paused: bool = False
+    include_inactive: bool = False
+    page_limit: int = 100
+    timeout_seconds: float = 30.0
+    domain_tag_prefix: str = "domain:"
+    cleanup_orphans: bool = False
+
+
 class IngestionStats(BaseModel):
     """Statistics from an ingestion job."""
 
@@ -106,6 +130,66 @@ async def ingest_dbt(
         manifest_path=request.manifest_path,
         catalog_path=request.catalog_path,
         project_name=request.project_name,
+    )
+
+    response = IngestionResponse(
+        job_id=result.job_id,
+        status=result.status.value,
+        source_type=result.source_type,
+        source_name=result.source_name,
+        stats=IngestionStats.from_service(result.stats),
+        duration_seconds=result.duration_seconds,
+    )
+
+    if result.error_message:
+        response.message = result.error_message
+
+    return response
+
+
+@router.post("/airflow", response_model=IngestionResponse)
+async def ingest_airflow(
+    request: AirflowIngestRequest,
+    db: DbSession,
+) -> IngestionResponse:
+    """
+    Ingest Airflow DAG and task metadata via REST API.
+
+    Authentication credentials must be provided via environment variables.
+    The request specifies which env vars to use (e.g., AIRFLOW_TOKEN).
+
+    Example:
+        {
+            "base_url": "https://airflow.example.com",
+            "instance_name": "prod-airflow",
+            "auth_mode": "bearer_env",
+            "token_env": "AIRFLOW_TOKEN",
+            "dag_id_regex": "customer_.*",
+            "include_paused": false,
+            "cleanup_orphans": true
+        }
+
+    Note: Actual credentials (tokens, passwords) are read from environment
+    variables at runtime and are never stored in the request or database.
+    """
+    service = IngestionService(db)
+
+    result = await service.ingest_airflow(
+        base_url=request.base_url,
+        instance_name=request.instance_name,
+        auth_mode=request.auth_mode,
+        token_env=request.token_env,
+        username_env=request.username_env,
+        password_env=request.password_env,
+        dag_id_allowlist=request.dag_id_allowlist,
+        dag_id_denylist=request.dag_id_denylist,
+        dag_id_regex=request.dag_id_regex,
+        include_paused=request.include_paused,
+        include_inactive=request.include_inactive,
+        page_limit=request.page_limit,
+        timeout_seconds=request.timeout_seconds,
+        domain_tag_prefix=request.domain_tag_prefix,
+        cleanup_orphans=request.cleanup_orphans,
     )
 
     response = IngestionResponse(

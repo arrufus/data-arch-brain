@@ -2,20 +2,52 @@
 
 ## Overview
 
-Data Architecture Brain (DAB) is a read-only architecture intelligence platform that helps you understand, govern, and optimize your data landscape. It ingests metadata from dbt projects and provides insights into:
+Data Architecture Brain (DAB) is a read-only architecture intelligence platform that helps you understand, govern, and optimize your data landscape. It ingests metadata from dbt projects and Airflow orchestration platforms and provides insights into:
 
 - **PII/Sensitive Data Tracking**: Trace sensitive data through your transformation pipelines
 - **Architecture Conformance**: Detect anti-patterns and validate against best practices
-- **Lineage Analysis**: Understand data flow at model and column level
+- **Lineage Analysis**: Understand data flow at model, column, and orchestration level
 - **Impact Analysis**: Assess downstream effects of changes
+- **Redundancy Detection**: Identify duplicate and similar data assets
 - **Violation Management**: Track and resolve conformance violations
+- **Orchestration Visibility**: Map DAG workflows and task dependencies from Airflow
+- **Web Dashboard**: Modern React UI with 10+ pages for visual exploration
 
 ## Quick Start
+
+### Web Dashboard Access
+
+Access the web dashboard to visually explore your data architecture:
+
+```bash
+# Start all services (backend + frontend)
+docker compose up -d
+
+# Access the dashboard
+open http://localhost:3000
+```
+
+**Dashboard Pages:**
+- **`/capsules`** - Data Capsule Browser with search and filtering
+- **`/capsules/[urn]`** - Detailed capsule view with lineage visualization
+- **`/lineage`** - Interactive lineage graph (React Flow)
+- **`/compliance`** - PII Compliance Dashboard (inventory, exposure, trace)
+- **`/conformance`** - Architecture Conformance Scoring
+- **`/impact`** - Impact Analysis for assessing downstream effects
+- **`/redundancy`** - Redundancy Detection (find similar capsules)
+- **`/domains`** - Business domain browser
+- **`/products`** - Data Products with SLO tracking
+- **`/tags`** - Tag management and exploration
+- **`/settings`** - Configuration management
+- **`/reports`** - Generate and download reports
+
+### CLI and API Access
 
 ### Prerequisites
 
 - Docker and Docker Compose installed
-- A dbt project with `manifest.json` and optionally `catalog.json`
+- A dbt project with `manifest.json` and optionally `catalog.json` (for dbt ingestion)
+- Access to an Airflow REST API (for Airflow ingestion)
 
 ### Starting the Services
 
@@ -56,21 +88,36 @@ dab ingest dbt --manifest /path/to/your/dbt/target/manifest.json
 dab ingest dbt --manifest /path/to/manifest.json --catalog /path/to/catalog.json
 ```
 
+### Ingesting Your First Airflow Instance
+
+```bash
+# No authentication (for local/dev instances)
+dab ingest airflow --base-url http://localhost:8080
+
+# With bearer token authentication (recommended for production)
+export AIRFLOW_TOKEN=your-token-here
+dab ingest airflow \
+  --base-url https://airflow.example.com \
+  --auth-mode bearer_env
+
+# With DAG filtering
+dab ingest airflow \
+  --base-url https://airflow.example.com \
+  --auth-mode bearer_env \
+  --dag-regex "customer_.*"
+```
+
 ---
 
 ## CLI Commands Reference
 
 ### `dab ingest` - Ingest Metadata
 
-Ingest metadata from a dbt project:
+Ingest metadata from dbt projects or Airflow instances:
+
+#### dbt Ingestion
 
 ```bash
-# Basic ingestion (dbt is the default source type)
-dab ingest --manifest /path/to/manifest.json
-
-# Explicit source type
-dab ingest dbt --manifest /path/to/manifest.json
-
 # With catalog for column info
 dab ingest dbt --manifest /path/to/manifest.json --catalog /path/to/catalog.json
 
@@ -78,7 +125,7 @@ dab ingest dbt --manifest /path/to/manifest.json --catalog /path/to/catalog.json
 dab ingest dbt --manifest /path/to/manifest.json --project my_project
 ```
 
-**Options:**
+**dbt Options:**
 | Option | Short | Description |
 |--------|-------|-------------|
 | `--manifest` | `-m` | Path to manifest.json (required) |
@@ -92,6 +139,66 @@ Ingesting dbt project...
 ✓ Detected 12 PII columns
 ✓ Created 128 lineage edges
 Ingestion completed in 2.3s
+```
+
+#### Airflow Ingestion
+
+```bash
+# No authentication
+dab ingest airflow --base-url https://airflow.example.com
+
+# With bearer token
+export AIRFLOW_TOKEN=your-token
+dab ingest airflow --base-url https://airflow.example.com --auth-mode bearer_env
+
+# With basic auth
+export AIRFLOW_USERNAME=admin
+export AIRFLOW_PASSWORD=password
+dab ingest airflow --base-url https://airflow.example.com --auth-mode basic_env
+
+# With DAG filtering
+dab ingest airflow \
+  --base-url https://airflow.example.com \
+  --dag-regex "customer_.*" \
+  --include-paused
+
+# Full configuration
+dab ingest airflow \
+  --base-url https://airflow.example.com \
+  --instance prod-airflow \
+  --auth-mode bearer_env \
+  --dag-allowlist dag1,dag2,dag3 \
+  --page-limit 50 \
+  --timeout 60.0 \
+  --cleanup-orphans
+```
+
+**Airflow Options:**
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--base-url` | `-u` | Airflow REST API base URL (required) |
+| `--instance` | `-i` | Instance name for URN namespace |
+| `--auth-mode` | `-a` | Authentication: none, bearer_env, basic_env |
+| `--token-env` | | Environment variable name for bearer token |
+| `--username-env` | | Environment variable name for username |
+| `--password-env` | | Environment variable name for password |
+| `--dag-regex` | `-r` | Regex pattern to filter DAGs |
+| `--dag-allowlist` | | Comma-separated DAG IDs to include |
+| `--dag-denylist` | | Comma-separated DAG IDs to exclude |
+| `--include-paused` | | Include paused DAGs |
+| `--include-inactive` | | Include inactive DAGs |
+| `--page-limit` | | API pagination size (default: 100) |
+| `--timeout` | `-t` | HTTP timeout in seconds (default: 30) |
+| `--cleanup-orphans` | | Remove stale capsules from previous ingestions |
+
+**Example Output:**
+```
+Ingesting Airflow metadata...
+✓ Connected to Airflow 2.7.0
+✓ Found 23 DAGs
+✓ Parsed 156 tasks
+✓ Created 312 edges (223 contains + 89 flows_to)
+Ingestion completed in 4.1s
 ```
 
 ---
@@ -494,6 +601,387 @@ dab serve --reload
 
 ---
 
+### `dab redundancy` - Redundancy Detection
+
+Identify duplicate and overlapping data assets to reduce waste and consolidate redundant models.
+
+#### Find Similar Capsules
+
+Find data assets similar to a given capsule:
+
+```bash
+# Find similar capsules with default threshold (0.5)
+dab redundancy find "urn:dab:dbt:model:staging:stg_customers"
+
+# With custom threshold (higher = more strict)
+dab redundancy find "urn:dab:dbt:model:staging:stg_customers" --threshold 0.75
+
+# Limit results
+dab redundancy find "urn:dab:dbt:model:staging:stg_customers" --limit 5
+
+# JSON output
+dab redundancy find "urn:dab:dbt:model:staging:stg_customers" --format json
+```
+
+**Options:**
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--threshold` | `-t` | Minimum similarity score (0.0-1.0) | 0.5 |
+| `--limit` | `-l` | Maximum results to return | 10 |
+| `--format` | `-f` | Output format: table, json | table |
+
+**Example Output:**
+```
+Similar Capsules for stg_customers
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┓
+┃ Capsule Name              ┃ Score   ┃ Layer  ┃ Confidence   ┃ Type            ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━┩
+│ stg_customers_v2          │ 0.84    │ silver │ high         │ model           │
+│ staging_customers         │ 0.72    │ silver │ medium       │ model           │
+│ int_customers             │ 0.58    │ silver │ medium       │ model           │
+└───────────────────────────┴─────────┴────────┴──────────────┴─────────────────┘
+
+Top Match Reasons:
+  • Very similar names: 'stg_customers' vs 'stg_customers_v2'
+  • High schema overlap: 90% of columns match
+  • Same domain: customer
+```
+
+#### Compare Two Capsules
+
+Compare two specific capsules to assess similarity:
+
+```bash
+# Compare two capsules
+dab redundancy compare \
+  "urn:dab:dbt:model:staging:stg_customers" \
+  "urn:dab:dbt:model:staging:staging_customers"
+```
+
+**Example Output:**
+```
+Comparison: stg_customers vs staging_customers
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Similarity Breakdown
+┏━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┓
+┃ Component            ┃ Score   ┃ Weight  ┃
+┡━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━┩
+│ Name Similarity      │ 0.88    │ 30%     │
+│ Schema Similarity    │ 0.92    │ 35%     │
+│ Lineage Similarity   │ 0.85    │ 25%     │
+│ Metadata Similarity  │ 0.70    │ 10%     │
+├──────────────────────┼─────────┼─────────┤
+│ Combined Score       │ 0.86    │ 100%    │
+└──────────────────────┴─────────┴─────────┘
+
+Confidence: high
+
+Recommendation: Likely Duplicates
+
+These capsules appear to be duplicates or overlapping implementations.
+Consider consolidating them to reduce redundancy.
+
+Reasons:
+  • Very similar names
+  • High schema overlap: 92% of columns match
+  • Shared upstream sources: raw_customers
+  • Same layer: silver
+```
+
+#### List Duplicate Candidates
+
+Find high-confidence duplicate pairs across your data landscape:
+
+```bash
+# List all duplicate candidates (threshold 0.75)
+dab redundancy candidates
+
+# With custom threshold
+dab redundancy candidates --threshold 0.8
+
+# Filter by layer
+dab redundancy candidates --layer gold
+
+# Filter by capsule type
+dab redundancy candidates --capsule-type model
+```
+
+**Options:**
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--threshold` | `-t` | Minimum similarity score (0.5-1.0) | 0.75 |
+| `--layer` | `-l` | Filter by layer | - |
+| `--capsule-type` | `-c` | Filter by capsule type | - |
+
+**Example Output:**
+```
+Duplicate Candidates (threshold: 0.75)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+┏━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┓
+┃ Capsule 1           ┃ Capsule 2           ┃ Score   ┃ Layer1 ┃ Layer2 ┃
+┡━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━╇━━━━━━━━┩
+│ stg_customers       │ staging_customers   │ 0.88    │ silver │ silver │
+│ dim_customer        │ dim_customers       │ 0.82    │ gold   │ gold   │
+│ int_orders_daily    │ daily_orders        │ 0.76    │ silver │ silver │
+└─────────────────────┴─────────────────────┴─────────┴────────┴────────┘
+
+Found 3 high-confidence duplicate pairs
+Potential for consolidation and cost savings
+```
+
+#### Generate Redundancy Report
+
+Generate a comprehensive redundancy report:
+
+```bash
+# Table format (default)
+dab redundancy report
+
+# JSON format for processing
+dab redundancy report --format json > redundancy-report.json
+```
+
+**Options:**
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--format` | `-f` | Output format: table, json | table |
+
+**Example Output:**
+```
+Redundancy Report
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Summary:
+  Total Capsules:        150
+  Duplicate Pairs:       12
+
+Duplicates by Layer:
+  silver:    8 pairs
+  gold:      4 pairs
+
+Duplicates by Type:
+  model:     10 pairs
+  source:    2 pairs
+
+Savings Estimate:
+  Storage reduction:     ~120%
+  Compute reduction:     ~180%
+  Models to review:      24
+
+Top 10 Duplicate Candidates:
+┏━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Capsule 1           ┃ Capsule 2           ┃ Score   ┃ Reasons                      ┃
+┡━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ stg_customers       │ staging_customers   │ 0.88    │ Very similar names, 88% sc...│
+│ dim_customer        │ dim_customers       │ 0.82    │ Very similar names, High s...│
+└─────────────────────┴─────────────────────┴─────────┴──────────────────────────────┘
+```
+
+---
+
+## Web Dashboard Guide
+
+The Data Architecture Brain includes a modern React web dashboard for visual exploration of your data architecture. The dashboard provides an intuitive interface to all platform features.
+
+### Accessing the Dashboard
+
+```bash
+# Start all services
+docker compose up -d
+
+# Access at http://localhost:3000
+```
+
+### Dashboard Navigation
+
+The dashboard includes a sidebar with the following pages:
+
+#### **Home** (`/`)
+- Overview dashboard with summary statistics
+- Quick access to recent capsules and violations
+- Navigation cards to main features
+
+#### **Capsules** (`/capsules`)
+- Browse all data capsules (models, sources, seeds, DAGs, tasks)
+- **Search**: Full-text search across capsule names
+- **Filters**: Layer (bronze/silver/gold), Type (model/source/seed), Domain, Has PII
+- **Pagination**: Navigate large datasets
+- **Sort**: By name, updated date, column count
+- Click any capsule to view details
+
+#### **Capsule Detail** (`/capsules/[urn]`)
+- **Overview Tab**: Metadata, owner, source system, statistics
+- **Columns Tab**: List of columns with PII indicators, filterable by PII type
+- **Lineage Tab**: Upstream sources and downstream dependents (interactive graph or list view)
+- **Violations Tab**: Conformance violations for this capsule, filterable by severity
+
+#### **Lineage** (`/lineage`)
+- **Interactive Graph**: React Flow-based lineage visualization
+- **Type-Ahead Search**: Find capsules quickly with dropdown
+- **Direction Control**: View upstream, downstream, or both
+- **Depth Control**: Configure traversal depth (1-10 levels)
+- **Node Interactions**: Click nodes to navigate to capsule detail
+- **Deep Linking**: Share specific lineage views via URL
+
+#### **Compliance** (`/compliance`)
+- **PII Inventory Tab**:
+  - Summary statistics (total PII columns, affected capsules)
+  - Breakdown by PII type (email, phone, SSN, etc.)
+  - Breakdown by layer (bronze, silver, gold)
+  - Export to CSV
+  - Bar charts for visualization
+- **PII Exposure Tab**:
+  - List of unmasked PII in consumption layers (gold/marts)
+  - Severity indicators (critical, high, medium)
+  - Recommendations for masking
+  - Lineage path showing propagation
+- **PII Trace Tab**:
+  - Search by column URN
+  - Display trace results: origin, propagation path, terminals
+  - Masking status at terminals
+  - Visual flow diagram
+
+#### **Conformance** (`/conformance`)
+- **Overview Tab**:
+  - Real-time conformance score
+  - Breakdown by severity (critical, error, warning, info)
+  - Breakdown by category (naming, lineage, PII, documentation, testing)
+  - Auto-refresh every 5 minutes
+  - Manual refresh button
+- **Violations Tab**:
+  - List all violations with filtering
+  - Filter by severity, category, status
+  - Drill down to specific capsules
+  - Resolve or acknowledge violations
+- **Rules Tab**:
+  - View active conformance rules
+  - Upload custom rules (YAML)
+  - Export rules
+  - Filter by rule set, category
+
+#### **Impact** (`/impact`)
+- **Capsule Selection**: Type-ahead dropdown to select target capsule
+- **Depth Configuration**: Set traversal depth (1-10 levels)
+- **Impact Summary**:
+  - Total affected capsules
+  - High-impact warnings for production systems
+  - Breakdown by layer
+- **Affected Capsules List**:
+  - Grouped by propagation depth
+  - Type and layer indicators
+  - Direct navigation to capsule details
+
+#### **Redundancy** (`/redundancy`)
+- **Report Tab**:
+  - Summary of duplicate candidates
+  - Breakdown by layer and type
+  - Savings estimates (storage, compute)
+  - Top 10 duplicate pairs with similarity scores
+- **Finder Tab**:
+  - Search for similar capsules
+  - Configure similarity threshold (0.5-1.0)
+  - Same-type-only filter
+  - Results with similarity breakdown (name, schema, lineage, metadata)
+  - Human-readable similarity reasons
+
+#### **Domains** (`/domains`)
+- **Master-Detail Layout**:
+  - Left: List of all domains with search
+  - Right: Domain details with capsule list
+- **Domain Details**:
+  - Description, parent domain
+  - Statistics (capsule count)
+  - List of capsules in domain
+  - Navigation to capsule details
+
+#### **Data Products** (`/products`)
+- **Master-Detail Layout**:
+  - Left: List of all data products
+  - Right: Product details with SLO status
+- **Product Details**:
+  - Version, status (draft/active/deprecated)
+  - SLO configuration (freshness, availability, quality)
+  - SLO compliance status
+  - List of capsules (PART_OF relationships)
+  - Tags associated with product
+- **CRUD Operations**: Create, update, delete data products
+
+#### **Tags** (`/tags`)
+- **Master-Detail Layout**:
+  - Left: List of tags with category filter
+  - Right: Tag details
+- **Tag Details**:
+  - Category, sensitivity level, color
+  - List of tagged capsules
+  - List of tagged columns
+  - Navigation to capsule/column details
+- **Tag Management**: Create, update, delete tags
+
+#### **Settings** (`/settings`)
+- **Domains Tab**: Browse and manage business domains
+- **Tags Tab**: Full CRUD for tags with color picker, sensitivity levels
+- **Products Tab**: Manage data products
+- **Rules Tab**: Upload/export custom conformance rules
+- **System Info Tab**: View system configuration and health
+
+#### **Reports** (`/reports`)
+- **Report Types**:
+  - PII Inventory Report
+  - Conformance Report
+  - Capsule Summary Report
+- **Format Selection**: JSON, CSV, HTML
+- **Filter Options**: Layer, type, severity
+- **Generate & Download**: Trigger report generation and download
+
+### Dashboard Features
+
+#### Search & Filters
+- All list views support search and filtering
+- Filters persist across navigation
+- Clear filters button resets to defaults
+
+#### Navigation
+- Breadcrumbs for context
+- Back button support
+- Deep linking (shareable URLs)
+- Sidebar always visible with active page highlight
+
+#### Real-Time Updates
+- Auto-refresh for conformance score (5 minutes)
+- Manual refresh buttons where applicable
+- Loading states with spinners
+
+#### Responsive Design
+- Mobile-friendly layouts
+- Tablet and desktop optimized
+- Scrollable tables for large datasets
+
+#### Error Handling
+- User-friendly error messages
+- Retry mechanisms for failed requests
+- Graceful degradation
+
+### Dashboard Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `/` | Focus search input |
+| `Esc` | Close modals/dialogs |
+| `Ctrl+K` | Quick command palette (future) |
+
+### Dashboard Tips
+
+1. **Bookmarking**: Bookmark frequently accessed capsules - URLs are stable
+2. **Filters**: Use layer filters to focus on specific architecture layers
+3. **Lineage**: Start with depth=3 for balanced performance and visibility
+4. **PII Trace**: Use column URNs from capsule detail view
+5. **Reports**: Generate reports during off-peak hours for large datasets
+6. **Settings**: Regularly review and update tags for better organization
+
+---
+
 ## REST API Reference
 
 Once the server is running, access the interactive API documentation at:
@@ -541,26 +1029,57 @@ curl http://localhost:8002/api/v1/health
 |----------|--------|-------------|
 | `/api/v1/ingest/dbt` | POST | Ingest dbt project via file paths |
 | `/api/v1/ingest/dbt/upload` | POST | Ingest dbt project via file upload |
+| `/api/v1/ingest/airflow` | POST | Ingest Airflow DAG and task metadata |
 | `/api/v1/ingest/status/{job_id}` | GET | Get ingestion job status |
 | `/api/v1/ingest/cancel/{job_id}` | POST | Cancel ingestion job |
 | `/api/v1/ingest/history` | GET | Get ingestion history |
 
 ```bash
-# Ingest via file path
+# Ingest dbt via file path
 curl -X POST "http://localhost:8002/api/v1/ingest/dbt" \
   -H "X-API-Key: your-api-key" \
   -H "Content-Type: application/json" \
   -d '{"manifest_path": "/path/to/manifest.json", "catalog_path": "/path/to/catalog.json"}'
 
-# Ingest via file upload
+# Ingest dbt via file upload
 curl -X POST "http://localhost:8002/api/v1/ingest/dbt/upload" \
   -H "X-API-Key: your-api-key" \
   -F "manifest=@manifest.json" \
   -F "catalog=@catalog.json"
 
+# Ingest Airflow (no auth)
+curl -X POST "http://localhost:8002/api/v1/ingest/airflow" \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "base_url": "https://airflow.example.com"
+  }'
+
+# Ingest Airflow with authentication and filtering
+curl -X POST "http://localhost:8002/api/v1/ingest/airflow" \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "base_url": "https://airflow.example.com",
+    "instance_name": "prod-airflow",
+    "auth_mode": "bearer_env",
+    "token_env": "AIRFLOW_TOKEN",
+    "dag_id_regex": "customer_.*",
+    "include_paused": false,
+    "cleanup_orphans": true
+  }'
+
 # Check job status
 curl -H "X-API-Key: your-api-key" \
   "http://localhost:8002/api/v1/ingest/status/{job_id}"
+
+# List ingestion history (all sources)
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8002/api/v1/ingest/history?limit=20"
+
+# Filter history by source type
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8002/api/v1/ingest/history?source_type=airflow"
 ```
 
 ### Capsule Endpoints
@@ -905,6 +1424,156 @@ curl -H "X-API-Key: your-api-key" \
 # cat import.cypher | cypher-shell -u neo4j -p password
 ```
 
+### Redundancy Detection Endpoints
+
+Identify duplicate and overlapping data assets using multi-algorithm similarity scoring.
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/redundancy/capsules/{urn}/similar` | GET | Find capsules similar to the given URN |
+| `/api/v1/redundancy/capsules/{urn}/similar/{other_urn}` | GET | Compare two specific capsules |
+| `/api/v1/redundancy/candidates` | GET | Get high-confidence duplicate candidates |
+| `/api/v1/redundancy/report` | GET | Get comprehensive redundancy report |
+
+**Similarity Algorithms:**
+
+Redundancy detection uses 4 weighted algorithms:
+- **Name Similarity (30%)**: Fuzzy string matching using Ratcliff/Obershelp
+- **Schema Similarity (35%)**: Jaccard index on column names/types
+- **Lineage Similarity (25%)**: Jaccard index on upstream dependencies
+- **Metadata Similarity (10%)**: Domain, layer, tags, description comparison
+
+**Similarity Thresholds:**
+- **High (≥0.75)**: Likely duplicates - consolidation recommended
+- **Medium (0.50-0.74)**: Potential overlap - manual review suggested
+- **Low (<0.50)**: Distinct assets - not redundant
+
+```bash
+# Find similar capsules
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8002/api/v1/redundancy/capsules/urn:dab:dbt:model:staging:stg_customers/similar?threshold=0.5&limit=10"
+
+# Response:
+{
+  "target_urn": "urn:dab:dbt:model:staging:stg_customers",
+  "target_name": "stg_customers",
+  "threshold": 0.5,
+  "results_count": 2,
+  "results": [
+    {
+      "capsule_id": "uuid-123",
+      "capsule_urn": "urn:dab:dbt:model:staging:stg_customers_v2",
+      "capsule_name": "stg_customers_v2",
+      "capsule_type": "model",
+      "layer": "silver",
+      "domain_name": "customer",
+      "similarity": {
+        "name_score": 0.85,
+        "schema_score": 0.90,
+        "lineage_score": 0.75,
+        "metadata_score": 0.80,
+        "combined_score": 0.84,
+        "confidence": "high"
+      },
+      "reasons": [
+        "Very similar names: 'stg_customers' vs 'stg_customers_v2'",
+        "High schema overlap: 90% of columns match",
+        "Same domain: customer"
+      ]
+    }
+  ]
+}
+
+# Compare two capsules
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8002/api/v1/redundancy/capsules/urn:dab:dbt:model:staging:stg_customers/similar/urn:dab:dbt:model:staging:staging_customers"
+
+# Response:
+{
+  "capsule1": {
+    "capsule_urn": "urn:dab:dbt:model:staging:stg_customers",
+    "capsule_name": "stg_customers",
+    "similarity": { ... }
+  },
+  "capsule2": {
+    "capsule_urn": "urn:dab:dbt:model:staging:staging_customers",
+    "capsule_name": "staging_customers",
+    "similarity": { ... }
+  },
+  "recommendation": "likely_duplicates",
+  "explanation": "Combined similarity score of 0.86 indicates these are likely duplicates..."
+}
+
+# Get duplicate candidates (high confidence)
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8002/api/v1/redundancy/candidates?threshold=0.75&layer=gold"
+
+# Response:
+{
+  "threshold": 0.75,
+  "layer": "gold",
+  "candidates_count": 3,
+  "candidates": [
+    {
+      "capsule1_urn": "urn:dab:dbt:model:marts:dim_customer",
+      "capsule1_name": "dim_customer",
+      "capsule1_layer": "gold",
+      "capsule2_urn": "urn:dab:dbt:model:marts:dim_customers",
+      "capsule2_name": "dim_customers",
+      "capsule2_layer": "gold",
+      "similarity_score": 0.82,
+      "reasons": [
+        "Very similar names",
+        "High schema overlap: 95% of columns match"
+      ]
+    }
+  ]
+}
+
+# Get redundancy report
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8002/api/v1/redundancy/report"
+
+# Response:
+{
+  "total_capsules": 150,
+  "duplicate_pairs": 12,
+  "potential_duplicates": [...],
+  "by_layer": {
+    "silver": 8,
+    "gold": 4
+  },
+  "by_type": {
+    "model": 10,
+    "source": 2
+  },
+  "savings_estimate": {
+    "potential_storage_reduction": "120%",
+    "potential_compute_reduction": "180%",
+    "models_to_review": 24
+  }
+}
+```
+
+**Query Parameters for `/redundancy/capsules/{urn}/similar`:**
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `threshold` | float | Minimum similarity score (0.0-1.0) | 0.5 |
+| `limit` | int | Maximum results (1-100) | 10 |
+| `same_type_only` | bool | Only compare same capsule type | true |
+| `same_layer_only` | bool | Only compare same layer | false |
+
+**Query Parameters for `/redundancy/candidates`:**
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `threshold` | float | Minimum similarity score (0.5-1.0) | 0.75 |
+| `layer` | string | Filter by layer (bronze, silver, gold) | - |
+| `capsule_type` | string | Filter by type (model, source, seed) | - |
+
+---
+
 **Graph Export Options:**
 
 | Parameter | Description | Default |
@@ -1098,10 +1767,12 @@ urn:dab:{source}:{type}:{namespace}:{name}
 
 | Asset Type | URN Format | Example |
 |------------|------------|---------|
-| Model | `urn:dab:dbt:model:{project}.{schema}:{name}` | `urn:dab:dbt:model:jaffle_shop.marts:dim_customers` |
-| Source | `urn:dab:dbt:source:{project}.{schema}:{name}` | `urn:dab:dbt:source:jaffle_shop.raw:customers` |
-| Seed | `urn:dab:dbt:seed:{project}.{schema}:{name}` | `urn:dab:dbt:seed:jaffle_shop.seeds:country_codes` |
-| Column | `urn:dab:dbt:column:{project}.{schema}:{table}.{column}` | `urn:dab:dbt:column:jaffle_shop.marts:dim_customers.email` |
+| dbt Model | `urn:dab:dbt:model:{project}.{schema}:{name}` | `urn:dab:dbt:model:jaffle_shop.marts:dim_customers` |
+| dbt Source | `urn:dab:dbt:source:{project}.{schema}:{name}` | `urn:dab:dbt:source:jaffle_shop.raw:customers` |
+| dbt Seed | `urn:dab:dbt:seed:{project}.{schema}:{name}` | `urn:dab:dbt:seed:jaffle_shop.seeds:country_codes` |
+| dbt Column | `urn:dab:dbt:column:{project}.{schema}:{table}.{column}` | `urn:dab:dbt:column:jaffle_shop.marts:dim_customers.email` |
+| Airflow DAG | `urn:dab:airflow:dag:{instance}:{dag_id}` | `urn:dab:airflow:dag:prod-airflow:customer_daily_pipeline` |
+| Airflow Task | `urn:dab:airflow:task:{instance}:{dag_id}.{task_id}` | `urn:dab:airflow:task:prod-airflow:customer_daily_pipeline.extract_data` |
 
 ---
 
@@ -1201,3 +1872,122 @@ curl http://localhost:8002/metrics
 - View server logs for detailed error messages
 - Run `dab --help` for CLI options
 - File issues at https://github.com/your-org/data-arch-brain/issues
+
+---
+
+## Resetting the Application
+
+If you need to clear all data and start fresh, you can reset the application to remove all capsules, lineage, and property graph information.
+
+### Full Reset
+
+To remove all ingested data while preserving the database schema:
+
+```bash
+# Connect to PostgreSQL and clear all tables
+# For Docker deployments:
+docker compose exec postgres psql -U dab -d dab -c "
+TRUNCATE TABLE
+    lineage_edges,
+    column_lineage_edges,
+    conformance_violations,
+    capsule_tags,
+    column_tags,
+    data_product_capsules,
+    columns,
+    capsules,
+    data_products,
+    tags,
+    domains,
+    ingestion_jobs
+CASCADE;
+"
+
+# For local development (adjust connection details as needed):
+psql -h localhost -p 5433 -U dab -d dab -c "
+TRUNCATE TABLE
+    lineage_edges,
+    column_lineage_edges,
+    conformance_violations,
+    capsule_tags,
+    column_tags,
+    data_product_capsules,
+    columns,
+    capsules,
+    data_products,
+    tags,
+    domains,
+    ingestion_jobs
+CASCADE;
+"
+```
+
+### Clear Cache
+
+After resetting the database, clear the cache to ensure stale data is not served:
+
+```bash
+# If using Redis
+redis-cli -h localhost -p 6379 FLUSHDB
+
+# Or restart the application to clear in-memory cache
+docker compose restart dab-api
+```
+
+### Selective Reset
+
+You can also reset specific components:
+
+```bash
+# Clear only capsules and lineage (keeps tag definitions, rules)
+psql -h localhost -p 5433 -U dab -d dab -c "
+TRUNCATE TABLE
+    lineage_edges,
+    column_lineage_edges,
+    conformance_violations,
+    capsule_tags,
+    column_tags,
+    data_product_capsules,
+    columns,
+    capsules
+CASCADE;
+"
+
+# Clear only lineage information
+psql -h localhost -p 5433 -U dab -d dab -c "
+TRUNCATE TABLE lineage_edges, column_lineage_edges CASCADE;
+"
+
+# Clear only conformance violations (to re-run evaluation)
+psql -h localhost -p 5433 -U dab -d dab -c "
+TRUNCATE TABLE conformance_violations;
+"
+```
+
+### Verify Reset
+
+Confirm the reset was successful:
+
+```bash
+# Check capsule count (should be 0)
+dab capsules --limit 1
+
+# Or via API
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8002/api/v1/capsules?limit=1"
+# Expected: {"items": [], "total": 0, ...}
+
+# Verify application health
+curl http://localhost:8002/api/v1/health/ready
+# Expected: {"status": "ready"}
+```
+
+After resetting, you can re-ingest your data:
+
+```bash
+# Re-ingest dbt project
+dab ingest dbt --manifest /path/to/manifest.json --catalog /path/to/catalog.json
+
+# Re-ingest Airflow
+dab ingest airflow --base-url https://airflow.example.com --auth-mode bearer_env
+```

@@ -1,0 +1,72 @@
+version: 2
+
+models:
+  - name: int_customer_orders
+    description: Intermediate model joining customer and order data
+    meta:
+      owner: data_engineering
+      data_domain: customer_sales
+      layer: silver
+    columns:
+      - name: order_id
+        description: Unique order identifier
+        tests:
+          - not_null
+      - name: customer_id
+        description: Customer identifier
+        tests:
+          - not_null
+
+  - name: dim_customers
+    description: Customer dimension with enriched metrics
+    meta:
+      owner: data_engineering
+      data_domain: customer
+      layer: silver
+    columns:
+      - name: customer_id
+        description: Unique customer identifier
+        tests:
+          - unique
+          - not_null
+      - name: email
+        description: Customer email address
+        meta:
+          pii: true
+          pii_type: email
+          sensitivity: high
+        tests:
+          - not_null
+      - name: total_orders
+        description: Total number of orders placed by customer
+      - name: total_spent
+        description: Total amount spent by customer
+      - name: avg_order_value
+        description: Average order value for customer
+
+  - name: fct_orders
+    description: Orders fact table with aggregated order items
+    meta:
+      owner: data_engineering
+      data_domain: sales
+      layer: silver
+    columns:
+      - name: order_id
+        description: Unique order identifier
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: Foreign key to customer dimension
+        tests:
+          - not_null
+      - name: order_date
+        description: Date the order was placed
+        tests:
+          - not_null
+      - name: order_amount
+        description: Total order amount
+      - name: total_items
+        description: Number of line items in order
+      - name: total_quantity
+        description: Total quantity of items ordered

@@ -61,10 +61,18 @@ class CapsuleRepository(BaseRepository[Capsule]):
         return result.scalar_one_or_none()
 
     async def get_by_urn_with_columns(self, urn: str) -> Optional[Capsule]:
-        """Get capsule by URN with columns eagerly loaded."""
+        """Get capsule by URN with columns and related data eagerly loaded."""
         stmt = (
             select(Capsule)
-            .options(selectinload(Capsule.columns))
+            .options(
+                selectinload(Capsule.columns),
+                selectinload(Capsule.domain),
+                selectinload(Capsule.owner),
+                selectinload(Capsule.source_system),
+                selectinload(Capsule.violations),
+                selectinload(Capsule.upstream_edges),
+                selectinload(Capsule.downstream_edges),
+            )
             .where(Capsule.urn == urn)
         )
         result = await self.session.execute(stmt)

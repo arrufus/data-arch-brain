@@ -41,6 +41,7 @@ class ExportFormat(str, Enum):
     CYPHER = "cypher"
     MERMAID = "mermaid"
     JSON_LD = "json-ld"
+    JSON = "json"  # For visualization (React Flow)
 
 
 @dataclass
@@ -248,6 +249,8 @@ class GraphExportService:
             return self._to_mermaid(nodes, edges)
         elif format == ExportFormat.JSON_LD:
             return self._to_jsonld(nodes, edges)
+        elif format == ExportFormat.JSON:
+            return self._to_json(nodes, edges)
         else:
             raise ValueError(f"Unsupported format: {format}")
 
@@ -340,6 +343,8 @@ class GraphExportService:
             return self._to_mermaid(nodes, edges)
         elif format == ExportFormat.JSON_LD:
             return self._to_jsonld(nodes, edges)
+        elif format == ExportFormat.JSON:
+            return self._to_json(nodes, edges)
         else:
             raise ValueError(f"Unsupported format: {format}")
 
@@ -516,7 +521,9 @@ class GraphExportService:
         if direction in ("upstream", "both"):
             stmt = select(CapsuleLineage).where(
                 CapsuleLineage.target_id == capsule.id
-            ).options(selectinload(CapsuleLineage.source))
+            ).options(
+                selectinload(CapsuleLineage.source).selectinload(Capsule.domain)
+            )
             result = await self.session.execute(stmt)
             upstream = result.scalars().all()
 
@@ -543,7 +550,9 @@ class GraphExportService:
         if direction in ("downstream", "both"):
             stmt = select(CapsuleLineage).where(
                 CapsuleLineage.source_id == capsule.id
-            ).options(selectinload(CapsuleLineage.target))
+            ).options(
+                selectinload(CapsuleLineage.target).selectinload(Capsule.domain)
+            )
             result = await self.session.execute(stmt)
             downstream = result.scalars().all()
 
@@ -825,6 +834,37 @@ class GraphExportService:
         result = {
             **context,
             "@graph": list(node_data.values()),
+        }
+
+        return json.dumps(result, indent=2)
+
+    def _to_json(self, nodes: list[GraphNode], edges: list[GraphEdge]) -> str:
+        """Export to simple JSON format for visualization (React Flow)."""
+        # Convert nodes to visualization format
+        json_nodes = []
+        for node in nodes:
+            json_node = {
+                "urn": node.urn,
+                "name": node.name,
+                "type": node.node_type,
+                "layer": node.layer,
+                "has_pii": node.properties.get("has_pii", False),
+            }
+            json_nodes.append(json_node)
+
+        # Convert edges to visualization format
+        json_edges = []
+        for edge in edges:
+            json_edge = {
+                "source_urn": edge.source_urn,
+                "target_urn": edge.target_urn,
+                "edge_type": edge.edge_type,
+            }
+            json_edges.append(json_edge)
+
+        result = {
+            "nodes": json_nodes,
+            "edges": json_edges,
         }
 
         return json.dumps(result, indent=2)

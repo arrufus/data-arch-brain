@@ -1,0 +1,51 @@
+name: 'customer_analytics'
+version: '1.0.0'
+config-version: 2
+
+# DBT project configuration
+profile: 'customer_analytics'
+
+# Directory configurations
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# Model configurations
+models:
+  customer_analytics:
+    # Bronze layer models (staging)
+    bronze:
+      +materialized: view
+      +schema: bronze
+      +tags: ['bronze', 'staging']
+
+    # Silver layer models (dimensional)
+    silver:
+      +materialized: table
+      +schema: silver
+      +tags: ['silver', 'dimensional']
+
+    # Gold layer models (aggregated)
+    gold:
+      +materialized: table
+      +schema: gold
+      +tags: ['gold', 'metrics']
+
+# Seed configurations
+seeds:
+  customer_analytics:
+    +schema: bronze
+    +tags: ['seed', 'reference']
+
+# Documentation
+vars:
+  project_description: 'Customer analytics data pipeline'
+  data_owner: 'Data Team'

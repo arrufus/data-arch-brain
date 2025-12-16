@@ -26,6 +26,12 @@
 │                    Data Architecture Brain                       │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │         Next.js Web Dashboard (Port 3000)                │   │
+│  │  React UI: Capsules, PII Compliance, Reports, Settings  │   │
+│  └────────────────────┬─────────────────────────────────────┘   │
+│                       │ HTTP REST API                            │
+│                       ▼                                          │
 │  ┌──────────┐   ┌──────────────┐   ┌─────────────────────────┐  │
 │  │ FastAPI  │───│ Rate Limiter │───│ Authentication (API Key)│  │
 │  │ App      │   │ (SlowAPI)    │   │ Middleware              │  │
@@ -60,7 +66,8 @@
 
 | Component | Purpose | Port |
 |-----------|---------|------|
-| FastAPI Application | REST API server | 8000 |
+| Next.js Web Dashboard | React UI for visual exploration | 3000 |
+| FastAPI Application | REST API server | 8002 |
 | PostgreSQL | Primary database | 5433 |
 | Redis | Cache & rate limiting | 6379 |
 | Prometheus | Metrics scraping | 9090 |
@@ -208,20 +215,211 @@ redis-cli -h localhost -p 6379 INFO stats
 
 ### Ingesting Data
 
+#### dbt Ingestion
+
 ```bash
 # Via CLI
-dab ingest --source dbt --manifest /path/to/manifest.json --catalog /path/to/catalog.json
+dab ingest dbt --manifest /path/to/manifest.json --catalog /path/to/catalog.json
+
+# With project name override
+dab ingest dbt --manifest /path/to/manifest.json --project my_project
 
 # Via API
 curl -X POST "http://localhost:8000/api/v1/ingest/dbt" \
   -H "X-API-Key: your-api-key" \
   -H "Content-Type: application/json" \
   -d '{
-    "project_name": "my_project",
-    "manifest": { ... },
-    "catalog": { ... }
+    "manifest_path": "/path/to/manifest.json",
+    "catalog_path": "/path/to/catalog.json",
+    "project_name": "my_project"
   }'
 ```
+
+#### Airflow Ingestion
+
+```bash
+# Via CLI - No authentication
+dab ingest airflow --base-url https://airflow.example.com
+
+# With bearer token authentication
+export AIRFLOW_TOKEN=your-token-here
+dab ingest airflow \
+  --base-url https://airflow.example.com \
+  --auth-mode bearer_env
+
+# With basic authentication
+export AIRFLOW_USERNAME=admin
+export AIRFLOW_PASSWORD=password
+dab ingest airflow \
+  --base-url https://airflow.example.com \
+  --auth-mode basic_env
+
+# Filter by DAG regex
+dab ingest airflow \
+  --base-url https://airflow.example.com \
+  --dag-regex "customer_.*"
+
+# Include paused DAGs and cleanup orphans
+dab ingest airflow \
+  --base-url https://airflow.example.com \
+  --include-paused \
+  --cleanup-orphans
+
+# Full configuration with all options
+dab ingest airflow \
+  --base-url https://airflow.example.com \
+  --instance prod-airflow \
+  --auth-mode bearer_env \
+  --dag-regex "^(customer|product)_.*" \
+  --include-paused \
+  --page-limit 50 \
+  --timeout 60.0 \
+  --cleanup-orphans
+
+# Via API
+curl -X POST "http://localhost:8000/api/v1/ingest/airflow" \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "base_url": "https://airflow.example.com",
+    "instance_name": "prod-airflow",
+    "auth_mode": "bearer_env",
+    "token_env": "AIRFLOW_TOKEN",
+    "dag_id_regex": "customer_.*",
+    "include_paused": false,
+    "cleanup_orphans": true
+  }'
+
+# Check ingestion status
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8000/api/v1/ingest/job/{job_id}"
+
+# List recent ingestion jobs
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8000/api/v1/ingest/history?source_type=airflow&limit=10"
+```
+
+**Authentication Options:**
+- `none`: No authentication (for local/dev Airflow instances)
+- `bearer_env`: Bearer token from environment variable (recommended for production)
+- `basic_env`: Basic auth credentials from environment variables
+
+**DAG Filtering:**
+- `--dag-regex`: Filter DAGs by regex pattern
+- `--dag-allowlist`: Comma-separated list of DAG IDs to include (exclusive with denylist)
+- `--dag-denylist`: Comma-separated list of DAG IDs to exclude (exclusive with allowlist)
+- `--include-paused`: Include paused DAGs (default: false)
+- `--include-inactive`: Include inactive DAGs (default: false)
+
+### Resetting Application Data
+
+Remove all data capsules, lineage, and property graph information to restore the application to a clean state.
+
+#### Full Reset (All Data)
+
+```bash
+# Via PostgreSQL - Clear all data while preserving schema
+docker-compose exec postgres psql -U dab -d dab -c "
+TRUNCATE TABLE
+    lineage_edges,
+    column_lineage_edges,
+    conformance_violations,
+    capsule_tags,
+    column_tags,
+    data_product_capsules,
+    columns,
+    capsules,
+    data_products,
+    tags,
+    domains,
+    ingestion_jobs
+CASCADE;
+"
+
+# Clear Redis cache after database reset
+redis-cli -h localhost -p 6379 FLUSHDB
+
+# Verify reset
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8000/api/v1/capsules?limit=1" | jq '.total'
+# Expected: 0
+```
+
+#### Reset Specific Components
+
+```bash
+# Clear only capsules and lineage (keeps rules, tags definitions)
+docker-compose exec postgres psql -U dab -d dab -c "
+TRUNCATE TABLE
+    lineage_edges,
+    column_lineage_edges,
+    conformance_violations,
+    capsule_tags,
+    column_tags,
+    data_product_capsules,
+    columns,
+    capsules
+CASCADE;
+"
+
+# Clear only lineage information
+docker-compose exec postgres psql -U dab -d dab -c "
+TRUNCATE TABLE lineage_edges, column_lineage_edges CASCADE;
+"
+
+# Clear only property graph edges (keeps nodes)
+docker-compose exec postgres psql -U dab -d dab -c "
+TRUNCATE TABLE
+    lineage_edges,
+    column_lineage_edges,
+    capsule_tags,
+    column_tags,
+    data_product_capsules
+CASCADE;
+"
+
+# Clear only violations (for re-evaluation)
+docker-compose exec postgres psql -U dab -d dab -c "
+TRUNCATE TABLE conformance_violations;
+"
+
+# Clear only ingestion history
+docker-compose exec postgres psql -U dab -d dab -c "
+TRUNCATE TABLE ingestion_jobs;
+"
+```
+
+#### Reset via Database Migration
+
+For a complete reset with schema recreation:
+
+```bash
+# Rollback all migrations and re-apply
+alembic downgrade base
+alembic upgrade head
+
+# Clear Redis cache
+redis-cli -h localhost -p 6379 FLUSHDB
+```
+
+**Warning:** This approach recreates all tables and should only be used in development or when schema changes are needed.
+
+#### Post-Reset Verification
+
+```bash
+# Verify all data cleared
+curl -H "X-API-Key: your-api-key" "http://localhost:8000/api/v1/capsules?limit=1"
+# Expected: {"items": [], "total": 0, ...}
+
+curl -H "X-API-Key: your-api-key" "http://localhost:8000/api/v1/capsules/stats"
+# Expected: All counts at 0
+
+# Verify health still OK
+curl http://localhost:8000/api/v1/health/ready
+# Expected: {"status": "ready"}
+```
+
+---
 
 ### Running Conformance Evaluation
 
@@ -242,6 +440,43 @@ curl -X POST "http://localhost:8000/api/v1/conformance/evaluate" \
 ### Managing Data Products
 
 Data Products group capsules into logical units following the Data Mesh pattern. They track SLO compliance for freshness, availability, and quality.
+
+#### Via CLI
+
+```bash
+# List all data products
+dab products list
+
+# Filter by domain
+dab products list --domain customer
+
+# Filter by status
+dab products list --status active
+
+# Create a new data product
+dab products create \
+  --name "Customer 360" \
+  --description "Unified customer data product" \
+  --domain customer \
+  --owner data_engineering \
+  --version "v1.0"
+
+# Get product details
+dab products get "Customer 360"
+
+# Add a capsule to a data product (creates PART_OF edge)
+dab products add-capsule \
+  --product "Customer 360" \
+  --capsule "urn:dab:dbt:model:myproject.marts:dim_customers" \
+  --role output
+
+# Remove a capsule from a data product
+dab products remove-capsule \
+  --product "Customer 360" \
+  --capsule "urn:dab:dbt:model:myproject.marts:dim_customers"
+```
+
+#### Via API
 
 ```bash
 # List all data products
@@ -317,13 +552,63 @@ curl -X DELETE "http://localhost:8000/api/v1/tags/columns/{column_id}/{tag_id}" 
 
 Export the property graph for visualization tools or integration with graph databases.
 
+#### Via CLI
+
+```bash
+# Export full graph in Mermaid format (renders in GitHub, GitLab, Notion)
+dab graph export --format mermaid --output graph.mmd
+
+# Export in GraphML for Gephi or yEd
+dab graph export --format graphml --output graph.graphml
+
+# Export for Neo4j import (Cypher statements)
+dab graph export --format cypher --output import.cypher
+
+# Import to Neo4j
+cat import.cypher | cypher-shell -u neo4j -p password
+
+# Export DOT graph for Graphviz
+dab graph export --format dot --output graph.dot
+
+# Render DOT graph with Graphviz
+dot -Tpng graph.dot -o graph.png
+dot -Tsvg graph.dot -o graph.svg
+
+# Export filtered by domain
+dab graph export --format mermaid --domain customer --output customer_graph.mmd
+
+# Export lineage subgraph for a specific capsule
+dab graph export-lineage "urn:dab:dbt:model:project:orders" \
+  --format mermaid \
+  --depth 3 \
+  --output orders_lineage.mmd
+
+# Export upstream lineage only (data sources)
+dab graph export-lineage "urn:dab:dbt:model:project:orders" \
+  --format dot \
+  --direction upstream \
+  --depth 5 \
+  --output upstream.dot
+
+# Export downstream lineage only (data consumers)
+dab graph export-lineage "urn:dab:dbt:model:project:orders" \
+  --format mermaid \
+  --direction downstream \
+  --output downstream.mmd
+
+# Export to stdout (for piping or viewing)
+dab graph export --format mermaid
+```
+
+#### Via API
+
 ```bash
 # List available export formats
 curl -H "X-API-Key: your-api-key" \
   "http://localhost:8000/api/v1/graph/formats"
 # Response: ["graphml", "dot", "cypher", "mermaid", "json-ld"]
 
-# Export full graph in Mermaid format (renders in GitHub, GitLab, Notion)
+# Export full graph in Mermaid format
 curl -H "X-API-Key: your-api-key" \
   "http://localhost:8000/api/v1/graph/export?format=mermaid" > graph.mmd
 
@@ -335,16 +620,9 @@ curl -H "X-API-Key: your-api-key" \
 curl -H "X-API-Key: your-api-key" \
   "http://localhost:8000/api/v1/graph/export?format=cypher" > import.cypher
 
-# Import to Neo4j
-cat import.cypher | cypher-shell -u neo4j -p password
-
 # Export with additional nodes (columns, tags, data products)
 curl -H "X-API-Key: your-api-key" \
   "http://localhost:8000/api/v1/graph/export?format=dot&include_columns=true&include_tags=true&include_data_products=true" > full_graph.dot
-
-# Render DOT graph with Graphviz
-dot -Tpng full_graph.dot -o graph.png
-dot -Tsvg full_graph.dot -o graph.svg
 
 # Export lineage subgraph for a specific capsule
 curl -H "X-API-Key: your-api-key" \
@@ -473,6 +751,84 @@ curl -H "X-API-Key: your-api-key" \
    curl -X POST "http://localhost:8000/api/v1/ingest/jobs/{job_id}/retry" \
      -H "X-API-Key: your-api-key"
    ```
+
+### Runbook: Airflow Ingestion Issues
+
+**Symptoms:** Airflow ingestion failing, authentication errors, missing DAGs
+
+**Steps:**
+
+1. **Verify Airflow connectivity**
+   ```bash
+   # Test Airflow API directly
+   curl https://airflow.example.com/api/v1/version \
+     -H "Authorization: Bearer $AIRFLOW_TOKEN"
+   ```
+
+2. **Check authentication configuration**
+   ```bash
+   # Verify environment variables are set
+   echo $AIRFLOW_TOKEN
+   echo $AIRFLOW_USERNAME
+   echo $AIRFLOW_PASSWORD
+
+   # Test with different auth modes
+   dab ingest airflow \
+     --base-url https://airflow.example.com \
+     --auth-mode none  # Try without auth first
+   ```
+
+3. **Verify DAG filtering**
+   ```bash
+   # List DAGs directly from Airflow
+   curl "https://airflow.example.com/api/v1/dags?limit=10" \
+     -H "Authorization: Bearer $AIRFLOW_TOKEN"
+
+   # Test without filters
+   dab ingest airflow \
+     --base-url https://airflow.example.com \
+     --auth-mode bearer_env
+
+   # Gradually add filters
+   dab ingest airflow \
+     --base-url https://airflow.example.com \
+     --auth-mode bearer_env \
+     --dag-regex "test_.*"
+   ```
+
+4. **Check timeout and pagination settings**
+   ```bash
+   # Increase timeout for slow Airflow instances
+   dab ingest airflow \
+     --base-url https://airflow.example.com \
+     --timeout 120.0
+
+   # Reduce page size for large responses
+   dab ingest airflow \
+     --base-url https://airflow.example.com \
+     --page-limit 50
+   ```
+
+5. **Review ingestion job logs**
+   ```bash
+   # Get detailed job information
+   curl "http://localhost:8000/api/v1/ingest/history?source_type=airflow" \
+     -H "X-API-Key: your-api-key"
+
+   # Check for specific error patterns in logs
+   docker-compose logs dab-api | grep -i "airflow\|parse\|connection"
+   ```
+
+**Common Issues:**
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| `401 Unauthorized` | Missing or invalid auth token | Verify `AIRFLOW_TOKEN` is set and valid |
+| `404 Not Found` | Wrong base URL or API version | Check Airflow is accessible and using v1 API |
+| `Connection timeout` | Slow or unresponsive Airflow | Increase `--timeout` value |
+| `No DAGs found` | Filters too restrictive | Review regex, allowlist, denylist settings |
+| `Paused DAGs missing` | Paused DAGs excluded by default | Add `--include-paused` flag |
+| `Secrets in database` | Config not redacted | Check secret redaction is enabled (should be automatic) |
 
 ### Runbook: Memory Issues (OOM)
 

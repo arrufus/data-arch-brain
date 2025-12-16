@@ -14,7 +14,7 @@ services:
       - DATABASE_URL=postgresql+asyncpg://dab:dab_password@postgres:5432/dab
       - LOG_LEVEL=INFO
       - API_KEY=${API_KEY:-dev-api-key-change-in-prod}
-      - ENVIRONMENT=production
+      - ENVIRONMENT=development
     volumes:
       - ../data:/app/data:ro
       - ../backend/config:/app/config:ro
