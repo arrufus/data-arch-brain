@@ -7,7 +7,7 @@ from uuid import UUID
 from sqlalchemy import Boolean, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.models.base import DABBase, MetadataMixin, URNMixin, fk_ref
+from src.models.base import DCSBase, MetadataMixin, URNMixin, fk_ref
 
 if TYPE_CHECKING:
     from src.models.column import Column
@@ -43,7 +43,7 @@ class ArchitectureLayer(str, Enum):
     MARTS = "marts"
 
 
-class Capsule(DABBase, URNMixin, MetadataMixin):
+class Capsule(DCSBase, URNMixin, MetadataMixin):
     """Data Capsule - atomic unit of the data architecture graph."""
 
     __tablename__ = "capsules"

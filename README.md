@@ -1,4 +1,4 @@
-# Data Architecture Brain
+# Data Capsule Server
 
 A read-only architecture intelligence platform that ingests metadata from data infrastructure sources, constructs a unified graph representation of your data landscape, and provides intelligent insights for data governance, architecture conformance, and sensitive data tracking.
 
@@ -40,7 +40,7 @@ A read-only architecture intelligence platform that ingests metadata from data i
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd data-arch-brain
+cd data-capsule-server
 
 # Start all services
 make up
@@ -67,7 +67,7 @@ make up-tools
 
 ## Web Dashboard
 
-The Data Architecture Brain includes a modern React web dashboard for visual exploration and management of your data architecture.
+The Data Capsule Server includes a modern React web dashboard for visual exploration and management of your data architecture.
 
 ### Access the Dashboard
 
@@ -115,7 +115,7 @@ For detailed documentation, see [docs/DASHBOARD.md](docs/DASHBOARD.md).
 ## Project Structure
 
 ```
-data-arch-brain/
+data-capsule-server/
 ├── backend/
 │   ├── src/
 │   │   ├── api/           # FastAPI routers and endpoints

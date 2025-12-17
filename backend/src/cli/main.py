@@ -1,4 +1,4 @@
-"""CLI entry point for Data Architecture Brain."""
+"""CLI entry point for Data Capsule Server."""
 
 import asyncio
 from pathlib import Path
@@ -10,8 +10,8 @@ from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 app = typer.Typer(
-    name="dab",
-    help="Data Architecture Brain CLI - Analyze your data landscape",
+    name="dcs",
+    help="Data Capsule Server CLI - Analyze your data landscape",
     add_completion=False,
 )
 

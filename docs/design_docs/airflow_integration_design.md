@@ -9,7 +9,7 @@ The product specification calls out **Airflow (P2)** as a future integration sou
 - **Metadata type:** DAG definitions
 - **Output:** Pipeline metadata
 
-This document provides a design that fits the current Data Architecture Brain (DAB) implementation patterns (parser → ingestion orchestrator → persistence in the property graph → API/CLI query).
+This document provides a design that fits the current Data Capsule Server (DAB) implementation patterns (parser → ingestion orchestrator → persistence in the property graph → API/CLI query).
 
 ### 1.2 Goals (what we will deliver)
 1. **Ingest Airflow DAG + task metadata** into the existing DAB graph store.
@@ -70,7 +70,7 @@ This is compatible with representing *pipelines* (Airflow DAGs and tasks) withou
 - **API:** FastAPI routers for capsules, columns, conformance, compliance, ingestion, graph export.
   - Capsules and lineage endpoints do not enforce a strict set of capsule types.
   - Graph export uses `capsule.capsule_type` as the exported `node_type`.
-- **CLI:** `dab ingest dbt ...` is implemented; other source types currently produce an “Unknown source type” message.
+- **CLI:** `dcs ingest dbt ...` is implemented; other source types currently produce an “Unknown source type” message.
 
 ### 2.4 Key gaps relevant to Airflow
 1. **Secret handling:** ingestion job `config` is stored verbatim. This is safe for dbt file-path configs but not safe for Airflow tokens/passwords.
@@ -152,7 +152,7 @@ We will reuse `Capsule` for both DAGs and tasks.
 
 **DAG capsule**
 - `capsule_type`: `airflow_dag`
-- `urn`: `urn:dab:airflow:dag:{instance}:{dag_id}`
+- `urn`: `urn:dcs:airflow:dag:{instance}:{dag_id}`
 - `name`: `{dag_id}`
 - `description`: from Airflow if present
 - `meta`: schedule, paused/active flags, owners, tags, file location, etc.
@@ -160,7 +160,7 @@ We will reuse `Capsule` for both DAGs and tasks.
 
 **Task capsule**
 - `capsule_type`: `airflow_task`
-- `urn`: `urn:dab:airflow:task:{instance}:{dag_id}.{task_id}`
+- `urn`: `urn:dcs:airflow:task:{instance}:{dag_id}.{task_id}`
 - `name`: `{task_id}`
 - `meta`: operator/type, retries, timeouts, pool/queue, etc.
 
@@ -264,7 +264,7 @@ Do **not** implement file upload for Airflow (no artifacts to upload).
 
 ### 6.4 CLI ingestion
 Extend [backend/src/cli/main.py](backend/src/cli/main.py):
-- `dab ingest airflow --base-url ... --instance ... [--dag-regex ...] [--include-paused]`
+- `dcs ingest airflow --base-url ... --instance ... [--dag-regex ...] [--include-paused]`
 
 Prefer passing secrets via environment:
 - `AIRFLOW_TOKEN=... dab ingest airflow ...`
@@ -314,7 +314,7 @@ Add (optional) Prometheus counters:
 
 ### 8.2 Integration tests
 - API tests for `POST /api/v1/ingest/airflow` (use test DB, mock parser HTTP)
-- CLI tests for `dab ingest airflow` option parsing (mock `IngestionService`)
+- CLI tests for `dcs ingest airflow` option parsing (mock `IngestionService`)
 
 ### 8.3 Security tests
 - Ensure `IngestionJob.config` does not contain raw secrets when using bearer/basic auth.
@@ -376,12 +376,12 @@ Files
 - `backend/src/cli/main.py`
 
 Work
-- Add `airflow` branch under `dab ingest`.
+- Add `airflow` branch under `dcs ingest`.
 - Add options for base URL, instance, filters.
 - Document env vars for auth.
 
 Acceptance criteria
-- `dab ingest airflow --help` shows correct options.
+- `dcs ingest airflow --help` shows correct options.
 
 ### Milestone 5 — Tests
 Files
@@ -414,8 +414,8 @@ Work
 
 ## 11. Appendix — Example URNs
 
-- DAG: `urn:dab:airflow:dag:prod-airflow:customer_daily_pipeline`
-- Task: `urn:dab:airflow:task:prod-airflow:customer_daily_pipeline.extract_customers`
+- DAG: `urn:dcs:airflow:dag:prod-airflow:customer_daily_pipeline`
+- Task: `urn:dcs:airflow:task:prod-airflow:customer_daily_pipeline.extract_customers`
 
 ---
 

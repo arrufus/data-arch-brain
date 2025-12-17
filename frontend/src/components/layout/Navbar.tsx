@@ -17,7 +17,7 @@ export default function Navbar() {
         <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
           <Database className="w-8 h-8 text-blue-600" />
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Data Architecture Brain</h1>
+            <h1 className="text-xl font-bold text-gray-900">Data Capsule Server</h1>
             <p className="text-xs text-gray-500">Architecture Intelligence Platform</p>
           </div>
         </Link>

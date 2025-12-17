@@ -12,7 +12,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'Data Architecture Brain',
+  title: 'Data Capsule Server',
   description: 'Architecture Intelligence Platform - Analyze your data landscape',
   keywords: ['data architecture', 'data governance', 'PII compliance', 'data lineage', 'dbt'],
 };

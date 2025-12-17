@@ -14,7 +14,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database import Base
 from src.models.base import (
-    DABBase,
+    DCSBase,
     JSONType,
     UUIDType,
     fk_ref,
@@ -42,7 +42,7 @@ class CapsuleRole(str, Enum):
     INPUT = "input"  # Input dependency
 
 
-class DataProduct(DABBase):
+class DataProduct(DCSBase):
     """Logical data product grouping capsules.
 
     DataProduct represents a logical grouping of capsules that together

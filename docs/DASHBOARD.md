@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Data Architecture Brain Web Dashboard is a modern, responsive React application that provides visual access to your data architecture intelligence. Built with Next.js 16, TypeScript, and Tailwind CSS, it offers an intuitive interface for exploring data assets, monitoring PII compliance, and generating reports.
+The Data Capsule Server Web Dashboard is a modern, responsive React application that provides visual access to your data architecture intelligence. Built with Next.js 16, TypeScript, and Tailwind CSS, it offers an intuitive interface for exploring data assets, monitoring PII compliance, and generating reports.
 
 ## Features Implemented
 
@@ -328,7 +328,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 ## Support
 
 For issues or questions:
-- GitHub Issues: https://github.com/yourusername/data-arch-brain/issues
+- GitHub Issues: https://github.com/yourusername/data-capsule-server/issues
 - Documentation: `/docs`
 - API Docs: http://localhost:8002/api/v1/docs
 

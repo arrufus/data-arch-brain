@@ -1,4 +1,4 @@
-# Data Architecture Brain - Product Specification
+# Data Capsule Server - Product Specification
 
 **Version**: 1.0
 **Status**: Draft
@@ -28,7 +28,7 @@
 
 ### 1.1 Product Overview
 
-**Data Architecture Brain** is a read-only architecture intelligence platform that ingests metadata and lineage from diverse data infrastructure sources, constructs a unified graph representation of the data landscape, and provides intelligent insights for data governance, architecture conformance, and sensitive data tracking.
+**Data Capsule Server** is a read-only architecture intelligence platform that ingests metadata and lineage from diverse data infrastructure sources, constructs a unified graph representation of the data landscape, and provides intelligent insights for data governance, architecture conformance, and sensitive data tracking.
 
 ### 1.2 Key Value Propositions
 
@@ -69,9 +69,9 @@
 
 ### 2.3 Strategic Alignment
 
-Data Architecture Brain complements **Easy Modeller** (AI-assisted data modelling studio) by providing:
+Data Capsule Server complements **Easy Modeller** (AI-assisted data modelling studio) by providing:
 
-| Easy Modeller | Data Architecture Brain |
+| Easy Modeller | Data Capsule Server |
 |---------------|------------------------|
 | Design-time modelling | Runtime architecture analysis |
 | Forward engineering | Reverse engineering + validation |
@@ -200,7 +200,7 @@ Without visibility, teams:
 
 ### 5.1 The Data Capsule Model
 
-A **Data Capsule** is the atomic unit of the Data Architecture Brain graph. It represents a self-contained, domain-aligned data asset with full context.
+A **Data Capsule** is the atomic unit of the Data Capsule Server graph. It represents a self-contained, domain-aligned data asset with full context.
 
 #### 5.1.1 Data Capsule Definition
 
@@ -252,17 +252,17 @@ A **Data Capsule** is the atomic unit of the Data Architecture Brain graph. It r
 Each Data Capsule has a unique URN (Uniform Resource Name):
 
 ```
-urn:dab:{source}:{type}:{namespace}:{name}
+urn:dcs:{source}:{type}:{namespace}:{name}
 
 Examples:
-urn:dab:dbt:model:jaffle_shop.staging:stg_customers
-urn:dab:snowflake:table:analytics.marts:dim_customer
-urn:dab:bigquery:view:project.dataset:customer_360
+urn:dcs:dbt:model:jaffle_shop.staging:stg_customers
+urn:dcs:snowflake:table:analytics.marts:dim_customer
+urn:dcs:bigquery:view:project.dataset:customer_360
 ```
 
 ### 5.2 Graph Model
 
-The Data Architecture Brain maintains a property graph with the following structure:
+The Data Capsule Server maintains a property graph with the following structure:
 
 #### 5.2.1 Node Types
 
@@ -690,14 +690,14 @@ dab report lineage <urn> --output ./reports/lineage.html
 **Actor:** Priya (Privacy/Compliance Officer)
 
 **Preconditions:**
-- dbt project ingested into Data Architecture Brain
+- dbt project ingested into Data Capsule Server
 - PII columns tagged in dbt meta or detected by patterns
 
 **Flow:**
-1. Priya runs `dab pii inventory` to get complete PII inventory
+1. Priya runs `dcs pii inventory` to get complete PII inventory
 2. System returns list of all PII columns grouped by type
 3. Priya identifies email addresses in the customer domain
-4. Priya runs `dab pii trace urn:dab:dbt:column:stg_customers.email`
+4. Priya runs `dcs pii trace urn:dcs:dbt:column:stg_customers.email`
 5. System traces email from source → staging → mart
 6. System shows email is hashed in dim_customer (transformation: SHA256)
 7. Priya confirms PII handling is compliant
@@ -721,14 +721,14 @@ dab report lineage <urn> --output ./reports/lineage.html
 - Medallion architecture rules configured
 
 **Flow:**
-1. Dana runs `dab conformance score` for overall health check
+1. Dana runs `dcs conformance score` for overall health check
 2. System returns: 78% conformance (34/44 rules passing)
-3. Dana runs `dab conformance violations --severity error`
+3. Dana runs `dcs conformance violations --severity error`
 4. System lists violations:
    - 3 models in Gold sourcing directly from Bronze
    - 2 models with missing descriptions
    - 1 model with non-standard naming
-5. Dana reviews each violation with `dab capsules show <urn>`
+5. Dana reviews each violation with `dcs capsules show <urn>`
 6. Dana creates JIRA tickets for remediation
 7. After fixes, Dana re-ingests and re-runs conformance check
 8. Conformance score increases to 95%
@@ -752,7 +752,7 @@ dab report lineage <urn> --output ./reports/lineage.html
 
 **Flow:**
 1. Marcus needs to deprecate `stg_customers_legacy`
-2. Marcus runs `dab capsules lineage urn:dab:dbt:model:stg_customers_legacy --direction downstream --depth 5`
+2. Marcus runs `dcs capsules lineage urn:dcs:dbt:model:stg_customers_legacy --direction downstream --depth 5`
 3. System shows 12 downstream models depend on this table
 4. Marcus exports dependency list for stakeholder review
 5. Marcus identifies replacement strategy
@@ -778,8 +778,8 @@ dab report lineage <urn> --output ./reports/lineage.html
 
 **Flow:**
 1. Sam runs dbt build for new model
-2. Sam runs `dab ingest dbt` with updated manifest
-3. Sam runs `dab conformance check`
+2. Sam runs `dcs ingest dbt` with updated manifest
+3. Sam runs `dcs conformance check`
 4. System flags: new model `gold_customer_metrics` sources from Bronze
 5. System flags: new model lacks description
 6. Sam fixes issues and re-runs
@@ -859,7 +859,7 @@ dab report lineage <urn> --output ./reports/lineage.html
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                  Data Architecture Brain                    │
+│                  Data Capsule Server                    │
 ├─────────────────────────────────────────────────────────────┤
 │  ┌──────────┐    ┌──────────┐    ┌──────────┐             │
 │  │  Parser  │───▶│Transform │───▶│  Graph   │             │

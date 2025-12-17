@@ -22,7 +22,7 @@
 
 ## Overview
 
-This test environment provides a complete data pipeline infrastructure for testing the Data Architecture Brain (DAB) Airflow integration. It includes:
+This test environment provides a complete data pipeline infrastructure for testing the Data Capsule Server (DAB) Airflow integration. It includes:
 
 - **Apache Airflow**: Orchestrates dbt jobs and data pipelines
 - **PostgreSQL**: Two databases for bronze and silver data layers
@@ -215,7 +215,7 @@ dab capsules --type airflow_dag
 dab capsules --type airflow_task
 
 # View lineage for a specific DAG
-dab lineage --urn "urn:dab:airflow:dag:local-test:customer_analytics_pipeline"
+dab lineage --urn "urn:dcs:airflow:dag:local-test:customer_analytics_pipeline"
 ```
 
 ---
@@ -435,7 +435,7 @@ dab capsules --type airflow_dag
 ```bash
 # Get lineage for customer_analytics_pipeline
 dab lineage \
-  --urn "urn:dab:airflow:dag:local-test:customer_analytics_pipeline" \
+  --urn "urn:dcs:airflow:dag:local-test:customer_analytics_pipeline" \
   --direction downstream
 
 # Verify lineage includes:
@@ -479,7 +479,7 @@ dab stats --recent
 ```bash
 # Get lineage for daily_sales_summary
 dab lineage \
-  --urn "urn:dab:airflow:dag:local-test:daily_sales_summary" \
+  --urn "urn:dcs:airflow:dag:local-test:daily_sales_summary" \
   --direction upstream
 
 # Should show dependency on customer_analytics_pipeline via
@@ -558,7 +558,7 @@ psql -h postgres-data -U postgres -d bronze_db
 
 #### 4. DAB Ingestion Returns No DAGs
 
-**Symptom**: `dab capsules --type airflow_dag` returns empty
+**Symptom**: `dcs capsules --type airflow_dag` returns empty
 
 **Diagnosis**:
 1. Check Airflow is accessible:
@@ -634,23 +634,23 @@ docker-compose up -d
 
 **Airflow DAGs**:
 ```
-urn:dab:airflow:dag:local-test:customer_analytics_pipeline
-urn:dab:airflow:dag:local-test:daily_sales_summary
+urn:dcs:airflow:dag:local-test:customer_analytics_pipeline
+urn:dcs:airflow:dag:local-test:daily_sales_summary
 ```
 
 **Airflow Tasks**:
 ```
-urn:dab:airflow:task:local-test:customer_analytics_pipeline.pipeline_start
-urn:dab:airflow:task:local-test:customer_analytics_pipeline.dbt_deps
-urn:dab:airflow:task:local-test:customer_analytics_pipeline.dbt_seed
+urn:dcs:airflow:task:local-test:customer_analytics_pipeline.pipeline_start
+urn:dcs:airflow:task:local-test:customer_analytics_pipeline.dbt_deps
+urn:dcs:airflow:task:local-test:customer_analytics_pipeline.dbt_seed
 ...
 ```
 
 **dbt Models** (if dbt integration is added):
 ```
-urn:dab:dbt:model:customer_analytics.bronze:stg_customers
-urn:dab:dbt:model:customer_analytics.silver:dim_customers
-urn:dab:dbt:model:customer_analytics.silver:fct_orders
+urn:dcs:dbt:model:customer_analytics.bronze:stg_customers
+urn:dcs:dbt:model:customer_analytics.silver:dim_customers
+urn:dcs:dbt:model:customer_analytics.silver:fct_orders
 ```
 
 ### C. Environment Variables
@@ -786,7 +786,7 @@ SELECT COUNT(*) FROM bronze.customers;
 
 5. **Explore Lineage**:
    ```bash
-   dab lineage --urn "urn:dab:airflow:dag:local-test:customer_analytics_pipeline"
+   dab lineage --urn "urn:dcs:airflow:dag:local-test:customer_analytics_pipeline"
    ```
 
 6. **Check PII Detection**:

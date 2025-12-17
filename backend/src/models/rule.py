@@ -6,7 +6,7 @@ from typing import Optional
 from sqlalchemy import Boolean, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.models.base import DABBase, JSONType
+from src.models.base import DCSBase, JSONType
 
 
 class RuleSeverity(str, Enum):
@@ -38,7 +38,7 @@ class RuleScope(str, Enum):
     GLOBAL = "global"
 
 
-class Rule(DABBase):
+class Rule(DCSBase):
     """Conformance rule definition."""
 
     __tablename__ = "rules"

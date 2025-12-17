@@ -1,4 +1,4 @@
-# Data Architecture Brain - Database Schema
+# Data Capsule Server - Database Schema
 
 **Version**: 1.0
 **Status**: Draft
@@ -23,7 +23,7 @@
 
 ### 1.1 Schema Namespace
 
-All Data Architecture Brain tables reside in the `dab` schema to maintain separation from Easy Modeller tables.
+All Data Capsule Server tables reside in the `dab` schema to maintain separation from Easy Modeller tables.
 
 ```sql
 CREATE SCHEMA IF NOT EXISTS dab;
@@ -206,7 +206,7 @@ CREATE TABLE dab.capsules (
 
 -- Comments
 COMMENT ON TABLE dab.capsules IS 'Data Capsules - atomic units of the data architecture graph';
-COMMENT ON COLUMN dab.capsules.urn IS 'Uniform Resource Name: urn:dab:{source}:{type}:{namespace}:{name}';
+COMMENT ON COLUMN dab.capsules.urn IS 'Uniform Resource Name: urn:dcs:{source}:{type}:{namespace}:{name}';
 COMMENT ON COLUMN dab.capsules.meta IS 'Source-specific metadata (e.g., dbt config, freshness)';
 COMMENT ON COLUMN dab.capsules.tags IS 'Array of tag strings for filtering: ["pii", "finance", "critical"]';
 ```
@@ -690,7 +690,7 @@ COMMIT;
 ### 7.2 Alembic Migration Template
 
 ```python
-"""Initial schema for Data Architecture Brain
+"""Initial schema for Data Capsule Server
 
 Revision ID: 001
 Create Date: 2024-12-01
@@ -870,7 +870,7 @@ INSERT INTO dab.capsules (
 )
 VALUES (
     gen_random_uuid(),
-    'urn:dab:dbt:model:jaffle_shop.staging:stg_customers',
+    'urn:dcs:dbt:model:jaffle_shop.staging:stg_customers',
     'stg_customers',
     'model',
     'silver',
@@ -891,7 +891,7 @@ INSERT INTO dab.columns (
 )
 VALUES (
     gen_random_uuid(),
-    'urn:dab:dbt:column:jaffle_shop.staging:stg_customers.email',
+    'urn:dcs:dbt:column:jaffle_shop.staging:stg_customers.email',
     :capsule_id,
     'email',
     'VARCHAR',

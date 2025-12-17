@@ -1,4 +1,4 @@
-# Data Architecture Brain - Backend
+# Data Capsule Server - Backend
 
 A read-only architecture intelligence platform for analyzing data landscapes, tracking PII lineage, and detecting architecture anti-patterns.
 

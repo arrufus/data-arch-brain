@@ -19,7 +19,7 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 # Schema name
-SCHEMA = "dab"
+SCHEMA = "dcs"
 
 
 def upgrade() -> None:

@@ -79,7 +79,7 @@ export default function Home() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
         <p className="mt-2 text-gray-600">
-          Welcome to Data Architecture Brain - Your architecture intelligence platform
+          Welcome to Data Capsule Server - Your architecture intelligence platform
         </p>
       </div>
 

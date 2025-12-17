@@ -1,4 +1,4 @@
-# Data Architecture Brain - Operational Runbook
+# Data Capsule Server - Operational Runbook
 
 **Version:** 1.0
 **Last Updated:** January 2025
@@ -23,7 +23,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Data Architecture Brain                       │
+│                    Data Capsule Server                       │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │  ┌──────────────────────────────────────────────────────────┐   │
@@ -207,7 +207,7 @@ alembic revision --autogenerate -m "Description of changes"
 redis-cli -h localhost -p 6379 FLUSHDB
 
 # Clear specific cache patterns
-redis-cli -h localhost -p 6379 KEYS "dab:*" | xargs redis-cli DEL
+redis-cli -h localhost -p 6379 KEYS "dcs:*" | xargs redis-cli DEL
 
 # Check cache stats
 redis-cli -h localhost -p 6379 INFO stats
@@ -467,13 +467,13 @@ dab products get "Customer 360"
 # Add a capsule to a data product (creates PART_OF edge)
 dab products add-capsule \
   --product "Customer 360" \
-  --capsule "urn:dab:dbt:model:myproject.marts:dim_customers" \
+  --capsule "urn:dcs:dbt:model:myproject.marts:dim_customers" \
   --role output
 
 # Remove a capsule from a data product
 dab products remove-capsule \
   --product "Customer 360" \
-  --capsule "urn:dab:dbt:model:myproject.marts:dim_customers"
+  --capsule "urn:dcs:dbt:model:myproject.marts:dim_customers"
 ```
 
 #### Via API
@@ -578,20 +578,20 @@ dot -Tsvg graph.dot -o graph.svg
 dab graph export --format mermaid --domain customer --output customer_graph.mmd
 
 # Export lineage subgraph for a specific capsule
-dab graph export-lineage "urn:dab:dbt:model:project:orders" \
+dab graph export-lineage "urn:dcs:dbt:model:project:orders" \
   --format mermaid \
   --depth 3 \
   --output orders_lineage.mmd
 
 # Export upstream lineage only (data sources)
-dab graph export-lineage "urn:dab:dbt:model:project:orders" \
+dab graph export-lineage "urn:dcs:dbt:model:project:orders" \
   --format dot \
   --direction upstream \
   --depth 5 \
   --output upstream.dot
 
 # Export downstream lineage only (data consumers)
-dab graph export-lineage "urn:dab:dbt:model:project:orders" \
+dab graph export-lineage "urn:dcs:dbt:model:project:orders" \
   --format mermaid \
   --direction downstream \
   --output downstream.mmd
@@ -626,15 +626,15 @@ curl -H "X-API-Key: your-api-key" \
 
 # Export lineage subgraph for a specific capsule
 curl -H "X-API-Key: your-api-key" \
-  "http://localhost:8000/api/v1/graph/export/lineage/urn:dab:dbt:model:project:orders?format=mermaid&depth=3" > orders_lineage.mmd
+  "http://localhost:8000/api/v1/graph/export/lineage/urn:dcs:dbt:model:project:orders?format=mermaid&depth=3" > orders_lineage.mmd
 
 # Export upstream lineage only (data sources)
 curl -H "X-API-Key: your-api-key" \
-  "http://localhost:8000/api/v1/graph/export/lineage/urn:dab:dbt:model:project:orders?format=dot&direction=upstream&depth=5" > upstream.dot
+  "http://localhost:8000/api/v1/graph/export/lineage/urn:dcs:dbt:model:project:orders?format=dot&direction=upstream&depth=5" > upstream.dot
 
 # Export downstream lineage only (data consumers)
 curl -H "X-API-Key: your-api-key" \
-  "http://localhost:8000/api/v1/graph/export/lineage/urn:dab:dbt:model:project:orders?format=mermaid&direction=downstream" > downstream.mmd
+  "http://localhost:8000/api/v1/graph/export/lineage/urn:dcs:dbt:model:project:orders?format=mermaid&direction=downstream" > downstream.mmd
 ```
 
 **Export Format Use Cases:**
@@ -665,7 +665,7 @@ curl -H "X-API-Key: your-api-key" \
 
 2. **Check logs**
    ```bash
-   docker-compose logs --tail=100 dab-api
+   docker-compose logs --tail=100 dcs-api
    ```
 
 3. **Check database connectivity**
@@ -680,7 +680,7 @@ curl -H "X-API-Key: your-api-key" \
 
 5. **Restart service if needed**
    ```bash
-   docker-compose restart dab-api
+   docker-compose restart dcs-api
    ```
 
 ### Runbook: High Latency
@@ -710,12 +710,12 @@ curl -H "X-API-Key: your-api-key" \
 
 4. **Check resource usage**
    ```bash
-   docker stats dab-api
+   docker stats dcs-api
    ```
 
 5. **Scale if needed**
    ```bash
-   docker-compose up -d --scale dab-api=4
+   docker-compose up -d --scale dcs-api=4
    ```
 
 ### Runbook: Ingestion Failures
@@ -738,7 +738,7 @@ curl -H "X-API-Key: your-api-key" \
 
 3. **Check for validation errors in logs**
    ```bash
-   docker-compose logs --tail=500 dab-api | grep -i "error\|validation"
+   docker-compose logs --tail=500 dcs-api | grep -i "error\|validation"
    ```
 
 4. **Validate input data**
@@ -816,7 +816,7 @@ curl -H "X-API-Key: your-api-key" \
      -H "X-API-Key: your-api-key"
 
    # Check for specific error patterns in logs
-   docker-compose logs dab-api | grep -i "airflow\|parse\|connection"
+   docker-compose logs dcs-api | grep -i "airflow\|parse\|connection"
    ```
 
 **Common Issues:**
@@ -838,7 +838,7 @@ curl -H "X-API-Key: your-api-key" \
 
 1. **Check memory usage**
    ```bash
-   docker stats dab-api --no-stream
+   docker stats dcs-api --no-stream
    ```
 
 2. **Analyze heap dump (if available)**
@@ -852,7 +852,7 @@ curl -H "X-API-Key: your-api-key" \
    ```yaml
    # docker-compose.yml
    services:
-     dab-api:
+     dcs-api:
        deploy:
          resources:
            limits:
@@ -976,7 +976,7 @@ psql -h localhost -U dab -d dab -f schema_20250101.sql
 
 ```bash
 # .env.production
-DATABASE_URL=postgresql+asyncpg://dab:secure_password@db.prod.example.com:5432/dab
+DATABASE_URL=postgresql+asyncpg://dcs:secure_password@db.prod.example.com:5432/dab
 REDIS_URL=redis://cache.prod.example.com:6379/0
 AUTH_ENABLED=true
 API_KEYS=key1_abc123,key2_def456

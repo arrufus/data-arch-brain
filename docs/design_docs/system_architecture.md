@@ -1,4 +1,4 @@
-# Data Architecture Brain - System Architecture
+# Data Capsule Server - System Architecture
 
 **Version**: 1.0
 **Status**: Draft
@@ -395,7 +395,7 @@
 └─────────────────────────────────────────────────────────────────────────┘
 
   User Request:
-  GET /api/v1/capsules/urn:dab:dbt:model:marts.dim_customer/lineage
+  GET /api/v1/capsules/urn:dcs:dbt:model:marts.dim_customer/lineage
       ?direction=both&depth=3
 
          │
@@ -553,8 +553,8 @@
 version: '3.8'
 
 services:
-  # Data Architecture Brain API
-  dab-api:
+  # Data Capsule Server API
+  dcs-api:
     build: ./backend
     ports:
       - "8001:8000"
@@ -593,7 +593,7 @@ volumes:
 │  │                        docker network: dab-network               │   │
 │  │                                                                   │   │
 │  │  ┌─────────────────┐              ┌─────────────────┐           │   │
-│  │  │   dab-api       │              │   postgres      │           │   │
+│  │  │   dcs-api       │              │   postgres      │           │   │
 │  │  │                 │              │                 │           │   │
 │  │  │  FastAPI App    │─────────────▶│  PostgreSQL 15  │           │   │
 │  │  │  Port: 8000     │              │  Port: 5432     │           │   │

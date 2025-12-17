@@ -129,7 +129,7 @@ class CapsuleDataProductRepository:
     """Repository for capsule-data product associations (PART_OF edges).
     
     Note: This doesn't inherit from BaseRepository since CapsuleDataProduct
-    uses a different base class (Base instead of DABBase).
+    uses a different base class (Base instead of DCSBase).
     """
 
     def __init__(self, session: AsyncSession):

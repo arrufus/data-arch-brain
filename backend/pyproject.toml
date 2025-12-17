@@ -1,6 +1,6 @@
 [project]
-name = "data-arch-brain"
-version = "0.1.0"
+name = "data-capsule-server"
+version = "0.2.0"
 description = "A read-only architecture intelligence platform for data landscape analysis"
 readme = "README.md"
 license = { text = "MIT" }
@@ -103,12 +103,12 @@ docs = [
 ]
 
 [project.scripts]
-dab = "src.cli.main:app"
+dcs = "src.cli.main:app"
 
 [project.urls]
-Homepage = "https://github.com/example/data-arch-brain"
-Documentation = "https://github.com/example/data-arch-brain#readme"
-Repository = "https://github.com/example/data-arch-brain"
+Homepage = "https://github.com/example/data-capsule-server"
+Documentation = "https://github.com/example/data-capsule-server#readme"
+Repository = "https://github.com/example/data-capsule-server"
 
 [build-system]
 requires = ["hatchling"]

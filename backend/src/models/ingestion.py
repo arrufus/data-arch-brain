@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Optional
 from sqlalchemy import DateTime, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.models.base import DABBase, JSONType
+from src.models.base import DCSBase, JSONType
 
 if TYPE_CHECKING:
     from src.models.capsule import Capsule
@@ -25,7 +25,7 @@ class IngestionStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class IngestionJob(DABBase):
+class IngestionJob(DCSBase):
     """Audit log of metadata ingestion runs."""
 
     __tablename__ = "ingestion_jobs"

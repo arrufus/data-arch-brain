@@ -135,16 +135,16 @@ class MetadataMixin:
 
 import os
 
-# Schema name for all DAB tables - disabled for SQLite (tests)
-# Use None for SQLite (no schema support) or "dab" for PostgreSQL
+# Schema name for all DCS tables - disabled for SQLite (tests)
+# Use None for SQLite (no schema support) or "dcs" for PostgreSQL
 _db_url = os.environ.get("DATABASE_URL", "")
-DAB_SCHEMA: str | None = None if "sqlite" in _db_url else "dab"
+DCS_SCHEMA: str | None = None if "sqlite" in _db_url else "dcs"
 
 
 def get_schema_table_args() -> dict:
     """Get table args with schema if not SQLite."""
-    if DAB_SCHEMA:
-        return {"schema": DAB_SCHEMA}
+    if DCS_SCHEMA:
+        return {"schema": DCS_SCHEMA}
     return {}
 
 
@@ -157,13 +157,13 @@ def fk_ref(table_column: str) -> str:
     Returns:
         Schema-prefixed reference for PostgreSQL, or just table.column for SQLite.
     """
-    if DAB_SCHEMA:
-        return f"{DAB_SCHEMA}.{table_column}"
+    if DCS_SCHEMA:
+        return f"{DCS_SCHEMA}.{table_column}"
     return table_column
 
 
-class DABBase(Base, UUIDMixin, TimestampMixin):
-    """Base class for all DAB models with common columns."""
+class DCSBase(Base, UUIDMixin, TimestampMixin):
+    """Base class for all DCS models with common columns."""
 
     __abstract__ = True
     __table_args__ = get_schema_table_args()
