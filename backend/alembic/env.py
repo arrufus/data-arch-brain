@@ -42,7 +42,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         include_schemas=True,
-        version_table_schema="dab",
+        version_table_schema="dcs",
     )
 
     with context.begin_transaction():
@@ -55,7 +55,7 @@ def do_run_migrations(connection: Connection) -> None:
         connection=connection,
         target_metadata=target_metadata,
         include_schemas=True,
-        version_table_schema="dab",
+        version_table_schema="dcs",
     )
 
     with context.begin_transaction():
