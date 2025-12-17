@@ -1,4 +1,4 @@
-"""Redis caching module for Data Architecture Brain.
+"""Redis caching module for Data Capsule Server.
 
 Provides caching decorators and utilities for improving query performance.
 Supports both Redis (for distributed deployments) and in-memory fallback (for development).

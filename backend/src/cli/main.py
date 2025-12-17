@@ -1389,7 +1389,7 @@ def serve(
     """Start the API server."""
     import uvicorn
 
-    console.print(f"[green]Starting Data Architecture Brain API...[/green]")
+    console.print(f"[green]Starting Data Capsule Server API...[/green]")
     console.print(f"  Host: {host}")
     console.print(f"  Port: {port}")
     console.print(f"  Docs: http://localhost:{port}/api/v1/docs")

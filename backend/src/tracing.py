@@ -1,6 +1,6 @@
 """Distributed tracing with OpenTelemetry.
 
-This module provides OpenTelemetry instrumentation for the Data Architecture Brain
+This module provides OpenTelemetry instrumentation for the Data Capsule Server
 application, enabling distributed tracing across service boundaries.
 
 Features:

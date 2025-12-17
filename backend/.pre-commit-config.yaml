@@ -1,4 +1,4 @@
-# Pre-commit hooks for Data Architecture Brain
+# Pre-commit hooks for Data Capsule Server
 # Install with: pre-commit install
 # Run manually: pre-commit run --all-files
 

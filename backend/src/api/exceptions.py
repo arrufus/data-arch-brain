@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 
 
 class DABException(Exception):
-    """Base exception for Data Architecture Brain."""
+    """Base exception for Data Capsule Server."""
 
     def __init__(
         self,
