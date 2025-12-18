@@ -6,14 +6,14 @@ from uuid import UUID
 from sqlalchemy import ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.models.base import DABBase, JSONType, fk_ref
+from src.models.base import DCSBase, JSONType, fk_ref
 
 if TYPE_CHECKING:
     from src.models.capsule import Capsule
     from src.models.data_product import DataProduct
 
 
-class Owner(DABBase):
+class Owner(DCSBase):
     """Team or individual owning data assets."""
 
     __tablename__ = "owners"
@@ -32,7 +32,7 @@ class Owner(DABBase):
     data_products: Mapped[list["DataProduct"]] = relationship(back_populates="owner")
 
 
-class Domain(DABBase):
+class Domain(DCSBase):
     """Business domain for organizing capsules."""
 
     __tablename__ = "domains"

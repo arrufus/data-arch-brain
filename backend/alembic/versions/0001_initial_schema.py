@@ -1,4 +1,4 @@
-"""Initial schema for Data Architecture Brain.
+"""Initial schema for Data Capsule Server.
 
 Revision ID: 0001
 Revises:
@@ -18,7 +18,7 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 # Schema name
-SCHEMA = "dab"
+SCHEMA = "dcs"
 
 
 def upgrade() -> None:

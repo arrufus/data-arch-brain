@@ -1,8 +1,7 @@
 # Docker Compose override for development
-version: '3.8'
 
 services:
-  dab-api:
+  dcs-api:
     build:
       context: ../backend
       dockerfile: Dockerfile
@@ -14,19 +13,21 @@ services:
       - ../data:/app/data:ro
       - ../backend/config:/app/config:ro
     environment:
-      - DATABASE_URL=postgresql+asyncpg://dab:dab_password@postgres:5432/dab
+      - DATABASE_URL=postgresql+asyncpg://dcs:dcs_password@postgres:5432/dcs
       - LOG_LEVEL=DEBUG
       - API_KEY=dev-api-key
       - ENVIRONMENT=development
       - DATABASE_ECHO=true
     command: uvicorn src.api.main:app --host 0.0.0.0 --port 8002 --reload
+    networks:
+      - dcs-network
 
   # pgAdmin for database management
   pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: dab-pgadmin
+    container_name: dcs-pgadmin
     environment:
-      - PGADMIN_DEFAULT_EMAIL=admin@dab.local
+      - PGADMIN_DEFAULT_EMAIL=admin@dcs.local
       - PGADMIN_DEFAULT_PASSWORD=admin
       - PGADMIN_CONFIG_SERVER_MODE=False
     ports:
@@ -36,10 +37,10 @@ services:
     depends_on:
       - postgres
     networks:
-      - dab-network
+      - dcs-network
     profiles:
       - tools
 
 volumes:
   pgadmin_data:
-    name: dab_pgadmin_data
+    name: dcs_pgadmin_data

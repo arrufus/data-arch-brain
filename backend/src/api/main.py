@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler."""
     # Startup
     configure_logging()
-    logger.info("Starting Data Architecture Brain", environment=settings.environment)
+    logger.info("Starting Data Capsule Server", environment=settings.environment)
     
     # Validate configuration (strict mode in production)
     validate_config(settings, strict=settings.is_production)
@@ -53,7 +53,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     yield
 
     # Shutdown
-    logger.info("Shutting down Data Architecture Brain")
+    logger.info("Shutting down Data Capsule Server")
 
     # Shutdown tracing
     if settings.tracing_enabled:
@@ -68,7 +68,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 API_DESCRIPTION = """
-# Data Architecture Brain API
+# Data Capsule Server API
 
 A read-only architecture intelligence platform for analyzing your data landscape.
 

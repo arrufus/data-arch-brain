@@ -1,4 +1,4 @@
-"""CLI module for Data Architecture Brain."""
+"""CLI module for Data Capsule Server."""
 
 from src.cli.main import app
 

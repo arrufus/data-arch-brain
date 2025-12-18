@@ -1,4 +1,4 @@
-# Data Architecture Brain - Deployment Guide
+# Data Capsule Server - Deployment Guide
 
 **Version**: 1.0
 **Status**: Draft
@@ -39,7 +39,7 @@
 │  │                     docker-compose.yml                           │   │
 │  │                                                                   │   │
 │  │  ┌───────────────┐              ┌───────────────┐               │   │
-│  │  │   dab-api     │              │   postgres    │               │   │
+│  │  │   dcs-api     │              │   postgres    │               │   │
 │  │  │               │              │               │               │   │
 │  │  │  FastAPI      │─────────────▶│  PostgreSQL   │               │   │
 │  │  │  Port: 8001   │              │  Port: 5432   │               │   │
@@ -69,7 +69,7 @@
 ### 2.2 Project Structure
 
 ```
-data-arch-brain/
+data-capsule-server/
 ├── backend/
 │   ├── src/
 │   │   ├── api/                 # FastAPI routers
@@ -98,24 +98,24 @@ data-arch-brain/
 
 ```bash
 # Clone and enter directory
-cd data-arch-brain
+cd data-capsule-server
 
 # Start services
 docker compose -f docker/docker-compose.yml up -d
 
 # Run migrations
-docker compose exec dab-api alembic upgrade head
+docker compose exec dcs-api alembic upgrade head
 
 # Verify API is running
 curl http://localhost:8001/api/v1/health
 
 # Ingest sample dbt project
-docker compose exec dab-api dab ingest dbt \
+docker compose exec dcs-api dab ingest dbt \
     --manifest /app/data/jaffle_shop/manifest.json \
     --catalog /app/data/jaffle_shop/catalog.json
 
 # Check conformance
-docker compose exec dab-api dab conformance score
+docker compose exec dcs-api dab conformance score
 ```
 
 ---
@@ -129,15 +129,15 @@ docker compose exec dab-api dab conformance score
 version: '3.8'
 
 services:
-  dab-api:
+  dcs-api:
     build:
       context: ../backend
       dockerfile: Dockerfile
-    container_name: dab-api
+    container_name: dcs-api
     ports:
       - "8001:8000"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://dab:dab_password@postgres:5432/dab
+      - DATABASE_URL=postgresql+asyncpg://dcs:dab_password@postgres:5432/dab
       - LOG_LEVEL=INFO
       - API_KEY=dev-api-key-change-in-prod
       - ENVIRONMENT=development
@@ -260,7 +260,7 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 version: '3.8'
 
 services:
-  dab-api:
+  dcs-api:
     build:
       context: ../backend
       dockerfile: Dockerfile
@@ -298,12 +298,12 @@ services:
 version: '3.8'
 
 services:
-  dab-api:
+  dcs-api:
     build:
       context: ../backend
       dockerfile: Dockerfile
     environment:
-      - DATABASE_URL=postgresql+asyncpg://dab:dab_password@postgres:5432/dab_test
+      - DATABASE_URL=postgresql+asyncpg://dcs:dab_password@postgres:5432/dab_test
       - LOG_LEVEL=WARNING
       - ENVIRONMENT=test
     depends_on:
@@ -329,11 +329,11 @@ services:
       context: ../backend
       dockerfile: Dockerfile
     environment:
-      - DATABASE_URL=postgresql+asyncpg://dab:dab_password@postgres:5432/dab_test
+      - DATABASE_URL=postgresql+asyncpg://dcs:dab_password@postgres:5432/dab_test
       - ENVIRONMENT=test
     command: pytest tests/ -v --cov=src --cov-report=term-missing
     depends_on:
-      - dab-api
+      - dcs-api
       - postgres
 ```
 
@@ -402,7 +402,7 @@ def get_settings() -> Settings:
 ```bash
 # .env.example
 # Database
-DATABASE_URL=postgresql+asyncpg://dab:dab_password@localhost:5433/dab
+DATABASE_URL=postgresql+asyncpg://dcs:dab_password@localhost:5433/dab
 
 # API Security
 API_KEY=your-secure-api-key-here
@@ -476,26 +476,26 @@ datefmt = %H:%M:%S
 
 ```bash
 # Create a new migration
-docker compose exec dab-api alembic revision --autogenerate -m "Description of changes"
+docker compose exec dcs-api alembic revision --autogenerate -m "Description of changes"
 
 # Apply all migrations
-docker compose exec dab-api alembic upgrade head
+docker compose exec dcs-api alembic upgrade head
 
 # Rollback one migration
-docker compose exec dab-api alembic downgrade -1
+docker compose exec dcs-api alembic downgrade -1
 
 # Show current revision
-docker compose exec dab-api alembic current
+docker compose exec dcs-api alembic current
 
 # Show migration history
-docker compose exec dab-api alembic history
+docker compose exec dcs-api alembic history
 ```
 
 ### 5.3 Initial Migration Script
 
 ```python
 # backend/alembic/versions/001_initial_schema.py
-"""Initial schema for Data Architecture Brain
+"""Initial schema for Data Capsule Server
 
 Revision ID: 001
 Revises:
@@ -848,7 +848,7 @@ def configure_logging():
 ```yaml
 # Production docker-compose overrides
 services:
-  dab-api:
+  dcs-api:
     deploy:
       resources:
         limits:
@@ -924,10 +924,10 @@ test:
 	docker compose -f docker/docker-compose.test.yml run --rm test-runner
 
 migrate:
-	docker compose exec dab-api alembic upgrade head
+	docker compose exec dcs-api alembic upgrade head
 
 shell:
-	docker compose exec dab-api /bin/bash
+	docker compose exec dcs-api /bin/bash
 
 clean:
 	docker compose -f docker/docker-compose.yml down -v --remove-orphans

@@ -1,6 +1,6 @@
-"""SQLAlchemy models for Data Architecture Brain."""
+"""SQLAlchemy models for Data Capsule Server."""
 
-from src.models.base import Base, DABBase, DAB_SCHEMA
+from src.models.base import Base, DCSBase, DCS_SCHEMA
 from src.models.capsule import ArchitectureLayer, Capsule, CapsuleType
 from src.models.column import Column, PIIDetectionMethod, PIIType, SemanticType
 from src.models.data_product import CapsuleDataProduct, CapsuleRole, DataProduct, DataProductStatus
@@ -15,8 +15,8 @@ from src.models.violation import Violation, ViolationStatus
 __all__ = [
     # Base
     "Base",
-    "DABBase",
-    "DAB_SCHEMA",
+    "DCSBase",
+    "DCS_SCHEMA",
     # Capsule
     "Capsule",
     "CapsuleType",

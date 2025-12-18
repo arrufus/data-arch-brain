@@ -1,7 +1,7 @@
 """Add data products and capsule associations tables.
 
 Revision ID: 20241214_data_products
-Revises: 20251211_2103_3aa00f7cbf3a_add_timestamp_columns_to_ingestion_jobs
+Revises: 0001
 Create Date: 2024-12-14 10:00:00.000000
 
 Implements:
@@ -17,12 +17,12 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers
 revision: str = "20241214_data_products"
-down_revision: Union[str, None] = "20251211_2103_3aa00f7cbf3a_add_timestamp_columns_to_ingestion_jobs"
+down_revision: Union[str, None] = "0001"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 # Schema name
-SCHEMA = "dab"
+SCHEMA = "dcs"
 
 
 def upgrade() -> None:

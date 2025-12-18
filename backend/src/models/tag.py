@@ -12,14 +12,14 @@ from sqlalchemy import DateTime, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database import Base
-from src.models.base import DABBase, JSONType, UUIDType, fk_ref, get_schema_table_args
+from src.models.base import DCSBase, JSONType, UUIDType, fk_ref, get_schema_table_args
 
 if TYPE_CHECKING:
     from src.models.capsule import Capsule
     from src.models.column import Column
 
 
-class Tag(DABBase):
+class Tag(DCSBase):
     """Reusable tag for classifying capsules and columns.
 
     Attributes:

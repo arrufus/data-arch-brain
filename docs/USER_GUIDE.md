@@ -1,8 +1,8 @@
-# Data Architecture Brain - User Guide
+# Data Capsule Server - User Guide
 
 ## Overview
 
-Data Architecture Brain (DAB) is a read-only architecture intelligence platform that helps you understand, govern, and optimize your data landscape. It ingests metadata from dbt projects and Airflow orchestration platforms and provides insights into:
+Data Capsule Server (DAB) is a read-only architecture intelligence platform that helps you understand, govern, and optimize your data landscape. It ingests metadata from dbt projects and Airflow orchestration platforms and provides insights into:
 
 - **PII/Sensitive Data Tracking**: Trace sensitive data through your transformation pipelines
 - **Architecture Conformance**: Detect anti-patterns and validate against best practices
@@ -111,7 +111,7 @@ dab ingest airflow \
 
 ## CLI Commands Reference
 
-### `dab ingest` - Ingest Metadata
+### `dcs ingest` - Ingest Metadata
 
 Ingest metadata from dbt projects or Airflow instances:
 
@@ -203,7 +203,7 @@ Ingestion completed in 4.1s
 
 ---
 
-### `dab capsules` - List Data Assets
+### `dcs capsules` - List Data Assets
 
 Browse your data capsules (models, sources, seeds):
 
@@ -237,15 +237,15 @@ dab capsules --limit 50
 ┏━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━┳━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃ Name               ┃ Type   ┃ Layer  ┃ Cols ┃ PII ┃ URN                                            ┃
 ┡━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━╇━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ dim_customers      │ model  │ gold   │   12 │ Yes │ urn:dab:dbt:model:jaffle_shop.marts:dim_cust...│
-│ fct_orders         │ model  │ gold   │    8 │ No  │ urn:dab:dbt:model:jaffle_shop.marts:fct_orders │
-│ stg_customers      │ model  │ silver │    6 │ Yes │ urn:dab:dbt:model:jaffle_shop.staging:stg_cu...│
+│ dim_customers      │ model  │ gold   │   12 │ Yes │ urn:dcs:dbt:model:jaffle_shop.marts:dim_cust...│
+│ fct_orders         │ model  │ gold   │    8 │ No  │ urn:dcs:dbt:model:jaffle_shop.marts:fct_orders │
+│ stg_customers      │ model  │ silver │    6 │ Yes │ urn:dcs:dbt:model:jaffle_shop.staging:stg_cu...│
 └────────────────────┴────────┴────────┴──────┴─────┴────────────────────────────────────────────────┘
 ```
 
 ---
 
-### `dab stats` - Architecture Statistics
+### `dcs stats` - Architecture Statistics
 
 Get a summary of your data architecture:
 
@@ -284,7 +284,7 @@ PII by Type:
 
 ---
 
-### `dab pii` - List PII Columns
+### `dcs pii` - List PII Columns
 
 Find all columns tagged as containing PII:
 
@@ -320,7 +320,7 @@ PII Columns (18 total)
 
 ---
 
-### `dab pii-inventory` - PII Inventory Report
+### `dcs pii-inventory` - PII Inventory Report
 
 Generate a comprehensive PII inventory:
 
@@ -368,7 +368,7 @@ By Layer:
 
 ---
 
-### `dab pii-exposure` - Detect Exposed PII
+### `dcs pii-exposure` - Detect Exposed PII
 
 Find PII that may be exposed in consumption layers:
 
@@ -409,13 +409,13 @@ Recommendation: Consider masking or hashing PII before exposing to gold layer.
 
 ---
 
-### `dab lineage` - Trace Lineage
+### `dcs lineage` - Trace Lineage
 
 View upstream and downstream dependencies:
 
 ```bash
 # Show lineage for a capsule (both directions)
-dab lineage urn:dab:dbt:model:jaffle_shop.staging:stg_customers
+dab lineage urn:dcs:dbt:model:jaffle_shop.staging:stg_customers
 
 # Only upstream dependencies (where data comes from)
 dab lineage <urn> --direction upstream
@@ -451,7 +451,7 @@ Downstream (dependents):
 
 ---
 
-### `dab conformance` - Conformance Score
+### `dcs conformance` - Conformance Score
 
 Check architecture conformance against best practices:
 
@@ -495,7 +495,7 @@ Run 'dab conformance-violations' to see specific violations.
 
 ---
 
-### `dab conformance-violations` - List Violations
+### `dcs conformance-violations` - List Violations
 
 View conformance rule violations:
 
@@ -539,7 +539,7 @@ Conformance Violations (18 total)
 
 ---
 
-### `dab conformance-rules` - List Rules
+### `dcs conformance-rules` - List Rules
 
 View available conformance rules:
 
@@ -577,7 +577,7 @@ Conformance Rules (25 total)
 
 ---
 
-### `dab serve` - Start API Server
+### `dcs serve` - Start API Server
 
 Start the REST API server:
 
@@ -601,7 +601,7 @@ dab serve --reload
 
 ---
 
-### `dab redundancy` - Redundancy Detection
+### `dcs redundancy` - Redundancy Detection
 
 Identify duplicate and overlapping data assets to reduce waste and consolidate redundant models.
 
@@ -611,16 +611,16 @@ Find data assets similar to a given capsule:
 
 ```bash
 # Find similar capsules with default threshold (0.5)
-dab redundancy find "urn:dab:dbt:model:staging:stg_customers"
+dab redundancy find "urn:dcs:dbt:model:staging:stg_customers"
 
 # With custom threshold (higher = more strict)
-dab redundancy find "urn:dab:dbt:model:staging:stg_customers" --threshold 0.75
+dab redundancy find "urn:dcs:dbt:model:staging:stg_customers" --threshold 0.75
 
 # Limit results
-dab redundancy find "urn:dab:dbt:model:staging:stg_customers" --limit 5
+dab redundancy find "urn:dcs:dbt:model:staging:stg_customers" --limit 5
 
 # JSON output
-dab redundancy find "urn:dab:dbt:model:staging:stg_customers" --format json
+dab redundancy find "urn:dcs:dbt:model:staging:stg_customers" --format json
 ```
 
 **Options:**
@@ -655,8 +655,8 @@ Compare two specific capsules to assess similarity:
 ```bash
 # Compare two capsules
 dab redundancy compare \
-  "urn:dab:dbt:model:staging:stg_customers" \
-  "urn:dab:dbt:model:staging:staging_customers"
+  "urn:dcs:dbt:model:staging:stg_customers" \
+  "urn:dcs:dbt:model:staging:staging_customers"
 ```
 
 **Example Output:**
@@ -783,7 +783,7 @@ Top 10 Duplicate Candidates:
 
 ## Web Dashboard Guide
 
-The Data Architecture Brain includes a modern React web dashboard for visual exploration of your data architecture. The dashboard provides an intuitive interface to all platform features.
+The Data Capsule Server includes a modern React web dashboard for visual exploration of your data architecture. The dashboard provides an intuitive interface to all platform features.
 
 ### Accessing the Dashboard
 
@@ -1100,11 +1100,11 @@ curl -H "X-API-Key: your-api-key" \
 
 # Get capsule details
 curl -H "X-API-Key: your-api-key" \
-  "http://localhost:8002/api/v1/capsules/urn:dab:dbt:model:jaffle_shop.marts:dim_customers/detail"
+  "http://localhost:8002/api/v1/capsules/urn:dcs:dbt:model:jaffle_shop.marts:dim_customers/detail"
 
 # Get capsule lineage
 curl -H "X-API-Key: your-api-key" \
-  "http://localhost:8002/api/v1/capsules/urn:dab:dbt:model:jaffle_shop.marts:dim_customers/lineage?direction=upstream&depth=3"
+  "http://localhost:8002/api/v1/capsules/urn:dcs:dbt:model:jaffle_shop.marts:dim_customers/lineage?direction=upstream&depth=3"
 ```
 
 ### Column Endpoints
@@ -1124,7 +1124,7 @@ curl -H "X-API-Key: your-api-key" \
 
 # Get column lineage
 curl -H "X-API-Key: your-api-key" \
-  "http://localhost:8002/api/v1/columns/urn:dab:dbt:column:jaffle_shop.marts:dim_customers.email/lineage"
+  "http://localhost:8002/api/v1/columns/urn:dcs:dbt:column:jaffle_shop.marts:dim_customers.email/lineage"
 ```
 
 ### Compliance Endpoints
@@ -1146,7 +1146,7 @@ curl -H "X-API-Key: your-api-key" \
 
 # Trace PII column lineage
 curl -H "X-API-Key: your-api-key" \
-  "http://localhost:8002/api/v1/compliance/pii-trace/urn:dab:dbt:column:jaffle_shop.marts:dim_customers.email"
+  "http://localhost:8002/api/v1/compliance/pii-trace/urn:dcs:dbt:column:jaffle_shop.marts:dim_customers.email"
 ```
 
 ### Conformance Endpoints
@@ -1410,11 +1410,11 @@ curl -H "X-API-Key: your-api-key" \
 
 # Export lineage subgraph for a specific capsule
 curl -H "X-API-Key: your-api-key" \
-  "http://localhost:8002/api/v1/graph/export/lineage/urn:dab:dbt:model:jaffle_shop.marts:dim_customers?format=mermaid&depth=3" > lineage.mmd
+  "http://localhost:8002/api/v1/graph/export/lineage/urn:dcs:dbt:model:jaffle_shop.marts:dim_customers?format=mermaid&depth=3" > lineage.mmd
 
 # Export upstream lineage only (where data comes from)
 curl -H "X-API-Key: your-api-key" \
-  "http://localhost:8002/api/v1/graph/export/lineage/urn:dab:dbt:model:project:orders?format=dot&direction=upstream&depth=5" > upstream.dot
+  "http://localhost:8002/api/v1/graph/export/lineage/urn:dcs:dbt:model:project:orders?format=dot&direction=upstream&depth=5" > upstream.dot
 
 # Export for Neo4j import
 curl -H "X-API-Key: your-api-key" \
@@ -1451,18 +1451,18 @@ Redundancy detection uses 4 weighted algorithms:
 ```bash
 # Find similar capsules
 curl -H "X-API-Key: your-api-key" \
-  "http://localhost:8002/api/v1/redundancy/capsules/urn:dab:dbt:model:staging:stg_customers/similar?threshold=0.5&limit=10"
+  "http://localhost:8002/api/v1/redundancy/capsules/urn:dcs:dbt:model:staging:stg_customers/similar?threshold=0.5&limit=10"
 
 # Response:
 {
-  "target_urn": "urn:dab:dbt:model:staging:stg_customers",
+  "target_urn": "urn:dcs:dbt:model:staging:stg_customers",
   "target_name": "stg_customers",
   "threshold": 0.5,
   "results_count": 2,
   "results": [
     {
       "capsule_id": "uuid-123",
-      "capsule_urn": "urn:dab:dbt:model:staging:stg_customers_v2",
+      "capsule_urn": "urn:dcs:dbt:model:staging:stg_customers_v2",
       "capsule_name": "stg_customers_v2",
       "capsule_type": "model",
       "layer": "silver",
@@ -1486,17 +1486,17 @@ curl -H "X-API-Key: your-api-key" \
 
 # Compare two capsules
 curl -H "X-API-Key: your-api-key" \
-  "http://localhost:8002/api/v1/redundancy/capsules/urn:dab:dbt:model:staging:stg_customers/similar/urn:dab:dbt:model:staging:staging_customers"
+  "http://localhost:8002/api/v1/redundancy/capsules/urn:dcs:dbt:model:staging:stg_customers/similar/urn:dcs:dbt:model:staging:staging_customers"
 
 # Response:
 {
   "capsule1": {
-    "capsule_urn": "urn:dab:dbt:model:staging:stg_customers",
+    "capsule_urn": "urn:dcs:dbt:model:staging:stg_customers",
     "capsule_name": "stg_customers",
     "similarity": { ... }
   },
   "capsule2": {
-    "capsule_urn": "urn:dab:dbt:model:staging:staging_customers",
+    "capsule_urn": "urn:dcs:dbt:model:staging:staging_customers",
     "capsule_name": "staging_customers",
     "similarity": { ... }
   },
@@ -1515,10 +1515,10 @@ curl -H "X-API-Key: your-api-key" \
   "candidates_count": 3,
   "candidates": [
     {
-      "capsule1_urn": "urn:dab:dbt:model:marts:dim_customer",
+      "capsule1_urn": "urn:dcs:dbt:model:marts:dim_customer",
       "capsule1_name": "dim_customer",
       "capsule1_layer": "gold",
-      "capsule2_urn": "urn:dab:dbt:model:marts:dim_customers",
+      "capsule2_urn": "urn:dcs:dbt:model:marts:dim_customers",
       "capsule2_name": "dim_customers",
       "capsule2_layer": "gold",
       "similarity_score": 0.82,
@@ -1618,7 +1618,7 @@ ENVIRONMENT=production  # or 'development'
 | Variable | Description | Default |
 |----------|-------------|---------|
 | **Database** |||
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql+asyncpg://dab:dab_password@localhost:5433/dab` |
+| `DATABASE_URL` | PostgreSQL connection string | `postgresql+asyncpg://dcs:dab_password@localhost:5433/dab` |
 | `DATABASE_POOL_SIZE` | Connection pool size | `5` |
 | `DATABASE_MAX_OVERFLOW` | Max overflow connections | `10` |
 | **Authentication** |||
@@ -1760,19 +1760,19 @@ The detection method is tracked for each PII column:
 DAB uses URNs (Uniform Resource Names) to uniquely identify assets:
 
 ```
-urn:dab:{source}:{type}:{namespace}:{name}
+urn:dcs:{source}:{type}:{namespace}:{name}
 ```
 
 ### Examples
 
 | Asset Type | URN Format | Example |
 |------------|------------|---------|
-| dbt Model | `urn:dab:dbt:model:{project}.{schema}:{name}` | `urn:dab:dbt:model:jaffle_shop.marts:dim_customers` |
-| dbt Source | `urn:dab:dbt:source:{project}.{schema}:{name}` | `urn:dab:dbt:source:jaffle_shop.raw:customers` |
-| dbt Seed | `urn:dab:dbt:seed:{project}.{schema}:{name}` | `urn:dab:dbt:seed:jaffle_shop.seeds:country_codes` |
-| dbt Column | `urn:dab:dbt:column:{project}.{schema}:{table}.{column}` | `urn:dab:dbt:column:jaffle_shop.marts:dim_customers.email` |
-| Airflow DAG | `urn:dab:airflow:dag:{instance}:{dag_id}` | `urn:dab:airflow:dag:prod-airflow:customer_daily_pipeline` |
-| Airflow Task | `urn:dab:airflow:task:{instance}:{dag_id}.{task_id}` | `urn:dab:airflow:task:prod-airflow:customer_daily_pipeline.extract_data` |
+| dbt Model | `urn:dcs:dbt:model:{project}.{schema}:{name}` | `urn:dcs:dbt:model:jaffle_shop.marts:dim_customers` |
+| dbt Source | `urn:dcs:dbt:source:{project}.{schema}:{name}` | `urn:dcs:dbt:source:jaffle_shop.raw:customers` |
+| dbt Seed | `urn:dcs:dbt:seed:{project}.{schema}:{name}` | `urn:dcs:dbt:seed:jaffle_shop.seeds:country_codes` |
+| dbt Column | `urn:dcs:dbt:column:{project}.{schema}:{table}.{column}` | `urn:dcs:dbt:column:jaffle_shop.marts:dim_customers.email` |
+| Airflow DAG | `urn:dcs:airflow:dag:{instance}:{dag_id}` | `urn:dcs:airflow:dag:prod-airflow:customer_daily_pipeline` |
+| Airflow Task | `urn:dcs:airflow:task:{instance}:{dag_id}.{task_id}` | `urn:dcs:airflow:task:prod-airflow:customer_daily_pipeline.extract_data` |
 
 ---
 
@@ -1786,7 +1786,7 @@ urn:dab:{source}:{type}:{namespace}:{name}
     "code": "NOT_FOUND",
     "message": "Capsule not found",
     "details": {
-      "urn": "urn:dab:dbt:model:example:missing"
+      "urn": "urn:dcs:dbt:model:example:missing"
     },
     "request_id": "abc-123"
   }
@@ -1827,7 +1827,7 @@ urn:dab:{source}:{type}:{namespace}:{name}
 - For Docker, ensure path is accessible in container
 
 **4. No columns showing**
-- Include the catalog.json file: `dab ingest dbt --manifest manifest.json --catalog catalog.json`
+- Include the catalog.json file: `dcs ingest dbt --manifest manifest.json --catalog catalog.json`
 - Run `dbt docs generate` first to create the catalog
 
 **5. PII not detected**
@@ -1838,12 +1838,12 @@ urn:dab:{source}:{type}:{namespace}:{name}
 **6. Conformance score seems wrong**
 - Review which rule sets are enabled
 - Check if your project follows expected conventions
-- Run `dab conformance-rules` to see active rules
+- Run `dcs conformance-rules` to see active rules
 
 **7. Reports returning 404**
 - Ensure the API server is running on the correct port (default: 8002)
 - Check the URL includes `/api/v1/` prefix
-- If running via Docker, rebuild container: `docker compose build dab-api && docker compose up -d dab-api`
+- If running via Docker, rebuild container: `docker compose build dcs-api && docker compose up -d dcs-api`
 
 **8. API returns stale data**
 - Clear cache by restarting the server
@@ -1854,7 +1854,7 @@ urn:dab:{source}:{type}:{namespace}:{name}
 
 ```bash
 # Check server logs
-docker compose logs -f dab-api
+docker compose logs -f dcs-api
 
 # Test database connectivity
 curl http://localhost:8002/api/v1/health/ready
@@ -1870,8 +1870,8 @@ curl http://localhost:8002/metrics
 
 - Check the API docs at http://localhost:8002/api/v1/docs
 - View server logs for detailed error messages
-- Run `dab --help` for CLI options
-- File issues at https://github.com/your-org/data-arch-brain/issues
+- Run `dcs --help` for CLI options
+- File issues at https://github.com/your-org/data-capsule-server/issues
 
 ---
 
@@ -1931,7 +1931,7 @@ After resetting the database, clear the cache to ensure stale data is not served
 redis-cli -h localhost -p 6379 FLUSHDB
 
 # Or restart the application to clear in-memory cache
-docker compose restart dab-api
+docker compose restart dcs-api
 ```
 
 ### Selective Reset

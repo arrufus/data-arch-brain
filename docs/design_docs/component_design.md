@@ -1,4 +1,4 @@
-# Data Architecture Brain - Component Design
+# Data Capsule Server - Component Design
 
 **Version**: 1.0
 **Status**: Draft
@@ -739,7 +739,7 @@ class DbtParser(MetadataParser):
 
     def _build_urn(self, source: str, node_type: str, namespace: str, name: str) -> str:
         """Build URN string."""
-        return f"urn:dab:{source}:{node_type}:{namespace}:{name}"
+        return f"urn:dcs:{source}:{node_type}:{namespace}:{name}"
 
     def _infer_layer(self, node: dict, patterns: Dict[str, List[str]]) -> Optional[str]:
         """Infer architecture layer from node name and path."""
@@ -2186,7 +2186,7 @@ from pathlib import Path
 from rich.console import Console
 from rich.table import Table
 
-app = typer.Typer(name="dab", help="Data Architecture Brain CLI")
+app = typer.Typer(name="dab", help="Data Capsule Server CLI")
 console = Console()
 
 

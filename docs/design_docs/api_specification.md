@@ -1,4 +1,4 @@
-# Data Architecture Brain - API Specification
+# Data Capsule Server - API Specification
 
 **Version**: 1.0
 **Status**: Draft
@@ -202,7 +202,7 @@ GET /api/v1/capsules
   "data": [
     {
       "id": "550e8400-e29b-41d4-a716-446655440000",
-      "urn": "urn:dab:dbt:model:jaffle_shop.marts:dim_customer",
+      "urn": "urn:dcs:dbt:model:jaffle_shop.marts:dim_customer",
       "name": "dim_customer",
       "capsule_type": "model",
       "layer": "gold",
@@ -259,7 +259,7 @@ GET /api/v1/capsules/{urn}
 {
   "data": {
     "id": "550e8400-e29b-41d4-a716-446655440000",
-    "urn": "urn:dab:dbt:model:jaffle_shop.marts:dim_customer",
+    "urn": "urn:dcs:dbt:model:jaffle_shop.marts:dim_customer",
     "name": "dim_customer",
     "capsule_type": "model",
     "layer": "gold",
@@ -313,7 +313,7 @@ GET /api/v1/capsules/{urn}/columns
   "data": [
     {
       "id": "...",
-      "urn": "urn:dab:dbt:column:jaffle_shop.marts:dim_customer.customer_id",
+      "urn": "urn:dcs:dbt:column:jaffle_shop.marts:dim_customer.customer_id",
       "name": "customer_id",
       "data_type": "INTEGER",
       "ordinal_position": 1,
@@ -327,7 +327,7 @@ GET /api/v1/capsules/{urn}/columns
     },
     {
       "id": "...",
-      "urn": "urn:dab:dbt:column:jaffle_shop.marts:dim_customer.email",
+      "urn": "urn:dcs:dbt:column:jaffle_shop.marts:dim_customer.email",
       "name": "email",
       "data_type": "VARCHAR",
       "ordinal_position": 3,
@@ -414,13 +414,13 @@ GET /api/v1/columns
   "data": [
     {
       "id": "...",
-      "urn": "urn:dab:dbt:column:jaffle_shop.marts:dim_customer.email",
+      "urn": "urn:dcs:dbt:column:jaffle_shop.marts:dim_customer.email",
       "name": "email",
       "data_type": "VARCHAR",
       "semantic_type": "pii",
       "pii_type": "email",
       "capsule": {
-        "urn": "urn:dab:dbt:model:jaffle_shop.marts:dim_customer",
+        "urn": "urn:dcs:dbt:model:jaffle_shop.marts:dim_customer",
         "name": "dim_customer",
         "layer": "gold"
       },
@@ -441,7 +441,7 @@ GET /api/v1/columns/{urn}
 {
   "data": {
     "id": "...",
-    "urn": "urn:dab:dbt:column:jaffle_shop.marts:dim_customer.email",
+    "urn": "urn:dcs:dbt:column:jaffle_shop.marts:dim_customer.email",
     "name": "email",
     "data_type": "VARCHAR(255)",
     "ordinal_position": 3,
@@ -451,7 +451,7 @@ GET /api/v1/columns/{urn}
     "pii_detected_by": "pattern",
     "description": "Customer email address (hashed in production)",
     "capsule": {
-      "urn": "urn:dab:dbt:model:jaffle_shop.marts:dim_customer",
+      "urn": "urn:dcs:dbt:model:jaffle_shop.marts:dim_customer",
       "name": "dim_customer",
       "layer": "gold",
       "domain": "customer"
@@ -495,14 +495,14 @@ GET /api/v1/capsules/{urn}/lineage
 {
   "data": {
     "root": {
-      "urn": "urn:dab:dbt:model:jaffle_shop.marts:dim_customer",
+      "urn": "urn:dcs:dbt:model:jaffle_shop.marts:dim_customer",
       "name": "dim_customer",
       "layer": "gold",
       "capsule_type": "model"
     },
     "upstream": [
       {
-        "urn": "urn:dab:dbt:model:jaffle_shop.staging:stg_customers",
+        "urn": "urn:dcs:dbt:model:jaffle_shop.staging:stg_customers",
         "name": "stg_customers",
         "layer": "silver",
         "capsule_type": "model",
@@ -510,7 +510,7 @@ GET /api/v1/capsules/{urn}/lineage
         "edge_type": "flows_to"
       },
       {
-        "urn": "urn:dab:dbt:source:jaffle_shop.raw:raw_customers",
+        "urn": "urn:dcs:dbt:source:jaffle_shop.raw:raw_customers",
         "name": "raw_customers",
         "layer": "bronze",
         "capsule_type": "source",
@@ -520,7 +520,7 @@ GET /api/v1/capsules/{urn}/lineage
     ],
     "downstream": [
       {
-        "urn": "urn:dab:dbt:model:jaffle_shop.marts:fct_orders",
+        "urn": "urn:dcs:dbt:model:jaffle_shop.marts:fct_orders",
         "name": "fct_orders",
         "layer": "gold",
         "capsule_type": "model",
@@ -528,7 +528,7 @@ GET /api/v1/capsules/{urn}/lineage
         "edge_type": "flows_to"
       },
       {
-        "urn": "urn:dab:dbt:model:jaffle_shop.reports:rpt_customer_metrics",
+        "urn": "urn:dcs:dbt:model:jaffle_shop.reports:rpt_customer_metrics",
         "name": "rpt_customer_metrics",
         "layer": "gold",
         "capsule_type": "model",
@@ -538,8 +538,8 @@ GET /api/v1/capsules/{urn}/lineage
     ],
     "edges": [
       {
-        "source_urn": "urn:dab:dbt:model:jaffle_shop.staging:stg_customers",
-        "target_urn": "urn:dab:dbt:model:jaffle_shop.marts:dim_customer",
+        "source_urn": "urn:dcs:dbt:model:jaffle_shop.staging:stg_customers",
+        "target_urn": "urn:dcs:dbt:model:jaffle_shop.marts:dim_customer",
         "edge_type": "flows_to",
         "transformation": "ref"
       }
@@ -572,7 +572,7 @@ GET /api/v1/columns/{urn}/lineage
 {
   "data": {
     "root": {
-      "urn": "urn:dab:dbt:column:jaffle_shop.marts:dim_customer.email",
+      "urn": "urn:dcs:dbt:column:jaffle_shop.marts:dim_customer.email",
       "name": "email",
       "capsule_name": "dim_customer",
       "semantic_type": "pii",
@@ -580,7 +580,7 @@ GET /api/v1/columns/{urn}/lineage
     },
     "upstream": [
       {
-        "urn": "urn:dab:dbt:column:jaffle_shop.staging:stg_customers.email",
+        "urn": "urn:dcs:dbt:column:jaffle_shop.staging:stg_customers.email",
         "name": "email",
         "capsule_name": "stg_customers",
         "layer": "silver",
@@ -590,7 +590,7 @@ GET /api/v1/columns/{urn}/lineage
         "pii_type": "email"
       },
       {
-        "urn": "urn:dab:dbt:column:jaffle_shop.raw:raw_customers.customer_email",
+        "urn": "urn:dcs:dbt:column:jaffle_shop.raw:raw_customers.customer_email",
         "name": "customer_email",
         "capsule_name": "raw_customers",
         "layer": "bronze",
@@ -602,7 +602,7 @@ GET /api/v1/columns/{urn}/lineage
     ],
     "downstream": [
       {
-        "urn": "urn:dab:dbt:column:jaffle_shop.reports:rpt_customer_metrics.email_hash",
+        "urn": "urn:dcs:dbt:column:jaffle_shop.reports:rpt_customer_metrics.email_hash",
         "name": "email_hash",
         "capsule_name": "rpt_customer_metrics",
         "layer": "gold",
@@ -614,8 +614,8 @@ GET /api/v1/columns/{urn}/lineage
     ],
     "transformations": [
       {
-        "from_urn": "urn:dab:dbt:column:jaffle_shop.marts:dim_customer.email",
-        "to_urn": "urn:dab:dbt:column:jaffle_shop.reports:rpt_customer_metrics.email_hash",
+        "from_urn": "urn:dcs:dbt:column:jaffle_shop.marts:dim_customer.email",
+        "to_urn": "urn:dcs:dbt:column:jaffle_shop.reports:rpt_customer_metrics.email_hash",
         "type": "hashed",
         "expression": "MD5(email)"
       }
@@ -660,7 +660,7 @@ GET /api/v1/compliance/pii-inventory
         "layers": ["bronze", "silver", "gold"],
         "columns": [
           {
-            "urn": "urn:dab:dbt:column:...",
+            "urn": "urn:dcs:dbt:column:...",
             "name": "email",
             "capsule_name": "dim_customer",
             "layer": "gold"
@@ -727,12 +727,12 @@ Identifies PII that may be improperly exposed (unmasked PII in Gold/consumption 
     "exposures": [
       {
         "column": {
-          "urn": "urn:dab:dbt:column:jaffle_shop.marts:dim_customer.email",
+          "urn": "urn:dcs:dbt:column:jaffle_shop.marts:dim_customer.email",
           "name": "email",
           "pii_type": "email"
         },
         "capsule": {
-          "urn": "urn:dab:dbt:model:jaffle_shop.marts:dim_customer",
+          "urn": "urn:dcs:dbt:model:jaffle_shop.marts:dim_customer",
           "name": "dim_customer",
           "layer": "gold"
         },
@@ -761,12 +761,12 @@ Traces a specific PII column through the entire pipeline.
 {
   "data": {
     "column": {
-      "urn": "urn:dab:dbt:column:jaffle_shop.staging:stg_customers.email",
+      "urn": "urn:dcs:dbt:column:jaffle_shop.staging:stg_customers.email",
       "name": "email",
       "pii_type": "email"
     },
     "origin": {
-      "urn": "urn:dab:dbt:column:jaffle_shop.raw:raw_customers.customer_email",
+      "urn": "urn:dcs:dbt:column:jaffle_shop.raw:raw_customers.customer_email",
       "name": "customer_email",
       "capsule_name": "raw_customers",
       "layer": "bronze",
@@ -774,25 +774,25 @@ Traces a specific PII column through the entire pipeline.
     },
     "propagation_path": [
       {
-        "column_urn": "urn:dab:dbt:column:jaffle_shop.raw:raw_customers.customer_email",
+        "column_urn": "urn:dcs:dbt:column:jaffle_shop.raw:raw_customers.customer_email",
         "layer": "bronze",
         "pii_status": "unmasked",
         "transformation": null
       },
       {
-        "column_urn": "urn:dab:dbt:column:jaffle_shop.staging:stg_customers.email",
+        "column_urn": "urn:dcs:dbt:column:jaffle_shop.staging:stg_customers.email",
         "layer": "silver",
         "pii_status": "unmasked",
         "transformation": "renamed"
       },
       {
-        "column_urn": "urn:dab:dbt:column:jaffle_shop.marts:dim_customer.email",
+        "column_urn": "urn:dcs:dbt:column:jaffle_shop.marts:dim_customer.email",
         "layer": "gold",
         "pii_status": "unmasked",
         "transformation": "direct"
       },
       {
-        "column_urn": "urn:dab:dbt:column:jaffle_shop.reports:rpt_metrics.email_hash",
+        "column_urn": "urn:dcs:dbt:column:jaffle_shop.reports:rpt_metrics.email_hash",
         "layer": "gold",
         "pii_status": "masked",
         "transformation": "hashed (MD5)"
@@ -800,12 +800,12 @@ Traces a specific PII column through the entire pipeline.
     ],
     "terminals": [
       {
-        "column_urn": "urn:dab:dbt:column:jaffle_shop.marts:dim_customer.email",
+        "column_urn": "urn:dcs:dbt:column:jaffle_shop.marts:dim_customer.email",
         "pii_status": "unmasked",
         "risk": "high"
       },
       {
-        "column_urn": "urn:dab:dbt:column:jaffle_shop.reports:rpt_metrics.email_hash",
+        "column_urn": "urn:dcs:dbt:column:jaffle_shop.reports:rpt_metrics.email_hash",
         "pii_status": "masked",
         "risk": "low"
       }
@@ -901,7 +901,7 @@ GET /api/v1/conformance/violations
       "status": "open",
       "subject": {
         "type": "capsule",
-        "urn": "urn:dab:dbt:model:jaffle_shop.marts:fct_orders",
+        "urn": "urn:dcs:dbt:model:jaffle_shop.marts:fct_orders",
         "name": "fct_orders"
       },
       "message": "Gold layer model 'fct_orders' sources directly from Bronze layer",

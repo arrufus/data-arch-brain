@@ -1,4 +1,4 @@
-# Data Architecture Brain - Phase 1 Gap Analysis
+# Data Capsule Server - Phase 1 Gap Analysis
 
 **Document Version:** 1.0
 **Analysis Date:** December 16, 2025
@@ -9,11 +9,11 @@
 
 ## Executive Summary
 
-This document provides a comprehensive gap analysis comparing the Data Architecture Brain implementation against the product specification, implementation gaps document, property graphs gaps document, and Airflow integration design. The analysis identifies **feature gaps, potential bugs, security concerns, performance issues, and technical debt** that should be addressed.
+This document provides a comprehensive gap analysis comparing the Data Capsule Server implementation against the product specification, implementation gaps document, property graphs gaps document, and Airflow integration design. The analysis identifies **feature gaps, potential bugs, security concerns, performance issues, and technical debt** that should be addressed.
 
 ### Overall Assessment
 
-The Data Architecture Brain is a **production-ready application** with:
+The Data Capsule Server is a **production-ready application** with:
 - ✅ **Core features complete:** dbt ingestion, Airflow ingestion, PII tracking, conformance checking, redundancy detection
 - ✅ **Full web dashboard:** Next.js React UI with 10+ pages (capsule browser, lineage viz, PII compliance, conformance, impact analysis, redundancy, settings)
 - ✅ **80%+ test coverage** with comprehensive unit and integration tests
@@ -112,7 +112,7 @@ From [airflow_integration_design.md](docs/design_docs/airflow_integration_design
 | **M1** | AirflowParser & Registry | ✅ Complete | [airflow_parser.py:499](backend/src/parsers/airflow_parser.py) lines |
 | **M2** | Ingestion Service Support | ✅ Complete | `ingest_airflow()` method |
 | **M3** | API Endpoint | ✅ Complete | `POST /api/v1/ingest/airflow` |
-| **M4** | CLI Support | ✅ Complete | `dab ingest airflow` command |
+| **M4** | CLI Support | ✅ Complete | `dcs ingest airflow` command |
 | **M5** | Tests | ✅ Complete | [test_airflow_parser.py](backend/tests/parsers/test_airflow_parser.py) |
 | **M6** | Documentation | ✅ Complete | USER_GUIDE.md updated |
 
@@ -226,10 +226,10 @@ def _infer_semantic_type(self, column_name: str, ...) -> str | None:
 - `GET /api/v1/redundancy/report` - Comprehensive redundancy report
 
 **CLI Commands:**
-- `dab redundancy find <urn>` - Find similar capsules
-- `dab redundancy compare <urn1> <urn2>` - Compare two capsules
-- `dab redundancy report` - Generate redundancy report
-- `dab redundancy candidates` - List duplicate candidates
+- `dcs redundancy find <urn>` - Find similar capsules
+- `dcs redundancy compare <urn1> <urn2>` - Compare two capsules
+- `dcs redundancy report` - Generate redundancy report
+- `dcs redundancy candidates` - List duplicate candidates
 
 **Testing:**
 - 40+ unit tests covering all similarity algorithms
@@ -968,14 +968,14 @@ class CapsuleType(str, Enum):
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: data-arch-brain
+  name: data-capsule-server
 spec:
   replicas: 3
   template:
     spec:
       containers:
       - name: api
-        image: data-arch-brain:latest
+        image: data-capsule-server:latest
         env:
         - name: DATABASE_URL
           valueFrom:
@@ -1001,7 +1001,7 @@ FROM python:3.11-slim  # x86_64 only
 
 **Recommendation:**
 ```bash
-docker buildx build --platform linux/amd64,linux/arm64 -t data-arch-brain .
+docker buildx build --platform linux/amd64,linux/arm64 -t data-capsule-server .
 ```
 
 **Effort:** 2-3 hours
@@ -1019,7 +1019,7 @@ docker buildx build --platform linux/amd64,linux/arm64 -t data-arch-brain .
 #!/bin/bash
 # scripts/backup-database.sh
 pg_dump $DATABASE_URL | gzip > backup-$(date +%Y%m%d).sql.gz
-aws s3 cp backup-*.sql.gz s3://backups/data-arch-brain/
+aws s3 cp backup-*.sql.gz s3://backups/data-capsule-server/
 ```
 
 **Effort:** 2-3 hours

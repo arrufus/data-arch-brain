@@ -17,15 +17,15 @@ class Settings(BaseSettings):
     )
 
     # Database
-    database_url: str = "postgresql+asyncpg://dab:dab_password@localhost:5433/dab"
+    database_url: str = "postgresql+asyncpg://dcs:dcs_password@localhost:5433/dcs"
     database_pool_size: int = 5
     database_max_overflow: int = 10
     database_echo: bool = False
 
     # API
     api_prefix: str = "/api/v1"
-    api_title: str = "Data Architecture Brain"
-    api_version: str = "0.1.0"
+    api_title: str = "Data Capsule Server"
+    api_version: str = "0.2.0"
     cors_origins: List[str] = ["*"]
 
     # Authentication
@@ -59,12 +59,12 @@ class Settings(BaseSettings):
 
     # Metrics & Observability
     metrics_enabled: bool = True
-    metrics_prefix: str = "dab"  # Prometheus metrics prefix
+    metrics_prefix: str = "dcs"  # Prometheus metrics prefix
 
     # Distributed Tracing (OpenTelemetry)
     tracing_enabled: bool = False  # Enable OpenTelemetry tracing
     tracing_otlp_endpoint: Optional[str] = None  # OTLP collector endpoint (e.g., "http://localhost:4317")
-    tracing_service_name: str = "data-architecture-brain"
+    tracing_service_name: str = "data-capsule-server"
     tracing_console_export: bool = False  # Enable console export for debugging
 
     # Application

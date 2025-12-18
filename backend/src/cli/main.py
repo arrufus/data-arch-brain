@@ -1,4 +1,4 @@
-"""CLI entry point for Data Architecture Brain."""
+"""CLI entry point for Data Capsule Server."""
 
 import asyncio
 from pathlib import Path
@@ -10,8 +10,8 @@ from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 app = typer.Typer(
-    name="dab",
-    help="Data Architecture Brain CLI - Analyze your data landscape",
+    name="dcs",
+    help="Data Capsule Server CLI - Analyze your data landscape",
     add_completion=False,
 )
 
@@ -615,6 +615,7 @@ def stats():
 def conformance_score(
     rule_set: Optional[str] = typer.Option(None, "--rule-set", "-r", help="Filter by rule set"),
     category: Optional[str] = typer.Option(None, "--category", "-c", help="Filter by category"),
+    persist: bool = typer.Option(False, "--persist", "-p", help="Persist violations to database"),
 ):
     """Show conformance score and summary."""
     from src.database import async_session_maker
@@ -627,7 +628,12 @@ def conformance_score(
             result = await service.evaluate(
                 rule_sets=[rule_set] if rule_set else None,
                 categories=[category] if category else None,
+                persist_violations=persist,
             )
+
+            if persist:
+                await session.commit()
+                console.print(f"[green]✓ Persisted {len(result.violations)} violations to database[/green]")
 
             # Score display with color based on value
             score_color = "green" if result.score >= 80 else "yellow" if result.score >= 60 else "red"
@@ -1389,7 +1395,7 @@ def serve(
     """Start the API server."""
     import uvicorn
 
-    console.print(f"[green]Starting Data Architecture Brain API...[/green]")
+    console.print(f"[green]Starting Data Capsule Server API...[/green]")
     console.print(f"  Host: {host}")
     console.print(f"  Port: {port}")
     console.print(f"  Docs: http://localhost:{port}/api/v1/docs")

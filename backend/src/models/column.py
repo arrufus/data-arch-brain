@@ -7,7 +7,7 @@ from uuid import UUID
 from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.models.base import DABBase, JSONType, URNMixin, fk_ref
+from src.models.base import DCSBase, JSONType, URNMixin, fk_ref
 
 if TYPE_CHECKING:
     from src.models.capsule import Capsule
@@ -58,7 +58,7 @@ class PIIDetectionMethod(str, Enum):
     MANUAL = "manual"
 
 
-class Column(DABBase, URNMixin):
+class Column(DCSBase, URNMixin):
     """Column within a Data Capsule."""
 
     __tablename__ = "columns"

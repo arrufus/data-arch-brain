@@ -99,9 +99,9 @@ class TestCLIHelp:
     def test_main_help(self):
         """Test main help output."""
         result = runner.invoke(app, ["--help"])
-        
+
         assert result.exit_code == 0
-        assert "Data Architecture Brain" in result.output
+        assert "Data Capsule Server" in result.output
 
     def test_ingest_help(self):
         """Test ingest command help."""

@@ -1038,7 +1038,7 @@ function SystemInfoTab() {
         <h3 className="text-md font-semibold text-gray-900 mb-4">About</h3>
         <div className="space-y-2">
           <p className="text-sm text-gray-700">
-            <strong>Data Architecture Brain</strong>
+            <strong>Data Capsule Server</strong>
           </p>
           <p className="text-sm text-gray-500">
             A comprehensive data governance platform for managing data capsules, tracking PII compliance,

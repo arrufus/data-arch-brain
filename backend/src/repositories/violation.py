@@ -140,6 +140,7 @@ class ViolationRepository:
         self,
         status: Optional[str] = None,
         severity: Optional[str] = None,
+        capsule_id: Optional[UUID] = None,
     ) -> int:
         """Count violations with optional filters."""
         stmt = select(func.count(Violation.id))
@@ -147,6 +148,8 @@ class ViolationRepository:
             stmt = stmt.where(Violation.status == status)
         if severity:
             stmt = stmt.where(Violation.severity == severity)
+        if capsule_id:
+            stmt = stmt.where(Violation.capsule_id == capsule_id)
         result = await self.session.execute(stmt)
         return result.scalar() or 0
 

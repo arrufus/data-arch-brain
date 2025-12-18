@@ -8,7 +8,7 @@ from uuid import UUID
 from sqlalchemy import DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.models.base import DABBase, JSONType, fk_ref
+from src.models.base import DCSBase, JSONType, fk_ref
 
 if TYPE_CHECKING:
     from src.models.capsule import Capsule
@@ -26,7 +26,7 @@ class ViolationStatus(str, Enum):
     FALSE_POSITIVE = "false_positive"
 
 
-class Violation(DABBase):
+class Violation(DCSBase):
     """Conformance rule violation."""
 
     __tablename__ = "violations"

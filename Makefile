@@ -1,4 +1,4 @@
-# Data Architecture Brain - Makefile
+# Data Capsule Server - Makefile
 # Run `make help` to see available commands
 
 .PHONY: help up down logs test lint format migrate shell clean build
@@ -13,7 +13,7 @@ YELLOW := \033[33m
 RESET := \033[0m
 
 help: ## Show this help message
-	@echo "$(CYAN)Data Architecture Brain$(RESET) - Available Commands:"
+	@echo "$(CYAN)Data Capsule Server$(RESET) - Available Commands:"
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(GREEN)%-15s$(RESET) %s\n", $$1, $$2}'
 
@@ -40,7 +40,7 @@ logs: ## View logs (follow mode)
 	docker compose -f docker/docker-compose.yml logs -f
 
 logs-api: ## View API logs only
-	docker compose -f docker/docker-compose.yml logs -f dab-api
+	docker compose -f docker/docker-compose.yml logs -f dcs-api
 
 build: ## Build Docker images
 	docker compose -f docker/docker-compose.yml build
@@ -53,26 +53,26 @@ rebuild: ## Force rebuild Docker images
 # ============================================
 
 migrate: ## Run database migrations
-	docker compose -f docker/docker-compose.yml exec dab-api alembic upgrade head
+	docker compose -f docker/docker-compose.yml exec dcs-api alembic upgrade head
 
 migrate-new: ## Create a new migration (usage: make migrate-new MSG="description")
-	docker compose -f docker/docker-compose.yml exec dab-api alembic revision --autogenerate -m "$(MSG)"
+	docker compose -f docker/docker-compose.yml exec dcs-api alembic revision --autogenerate -m "$(MSG)"
 
 migrate-down: ## Rollback one migration
-	docker compose -f docker/docker-compose.yml exec dab-api alembic downgrade -1
+	docker compose -f docker/docker-compose.yml exec dcs-api alembic downgrade -1
 
 migrate-history: ## Show migration history
-	docker compose -f docker/docker-compose.yml exec dab-api alembic history
+	docker compose -f docker/docker-compose.yml exec dcs-api alembic history
 
 db-shell: ## Open PostgreSQL shell
-	docker compose -f docker/docker-compose.yml exec postgres psql -U dab -d dab
+	docker compose -f docker/docker-compose.yml exec postgres psql -U dcs -d dcs
 
 # ============================================
 # Development Commands
 # ============================================
 
 shell: ## Open shell in API container
-	docker compose -f docker/docker-compose.yml exec dab-api /bin/bash
+	docker compose -f docker/docker-compose.yml exec dcs-api /bin/bash
 
 install: ## Install dependencies locally
 	cd backend && pip install -e ".[dev]"
@@ -115,16 +115,16 @@ check: lint typecheck test ## Run all checks (lint, typecheck, test)
 # ============================================
 
 cli-help: ## Show CLI help
-	docker compose -f docker/docker-compose.yml exec dab-api python -m src.cli.main --help
+	docker compose -f docker/docker-compose.yml exec dcs-api python -m src.cli.main --help
 
 ingest-dbt: ## Ingest dbt artifacts (usage: make ingest-dbt MANIFEST=/path/to/manifest.json)
-	docker compose -f docker/docker-compose.yml exec dab-api python -m src.cli.main ingest dbt --manifest $(MANIFEST)
+	docker compose -f docker/docker-compose.yml exec dcs-api python -m src.cli.main ingest dbt --manifest $(MANIFEST)
 
 pii-inventory: ## Show PII inventory
-	docker compose -f docker/docker-compose.yml exec dab-api python -m src.cli.main pii inventory
+	docker compose -f docker/docker-compose.yml exec dcs-api python -m src.cli.main pii inventory
 
 conformance-score: ## Show conformance score
-	docker compose -f docker/docker-compose.yml exec dab-api python -m src.cli.main conformance score
+	docker compose -f docker/docker-compose.yml exec dcs-api python -m src.cli.main conformance score
 
 # ============================================
 # Cleanup

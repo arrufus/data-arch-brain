@@ -6,9 +6,9 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.base import DABBase
+from src.models.base import DCSBase
 
-ModelT = TypeVar("ModelT", bound=DABBase)
+ModelT = TypeVar("ModelT", bound=DCSBase)
 
 
 class BaseRepository(Generic[ModelT]):

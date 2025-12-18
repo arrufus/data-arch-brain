@@ -11,7 +11,7 @@ export default function Footer() {
     <footer className="bg-white border-t border-gray-200 py-4 px-6 text-center text-sm text-gray-600">
       <div className="flex items-center justify-between max-w-7xl mx-auto">
         <div className="flex items-center gap-4">
-          <span>© {currentYear} Data Architecture Brain</span>
+          <span>© {currentYear} Data Capsule Server</span>
           <span className="text-gray-400">|</span>
           <span className="text-gray-500">v1.0.0-beta</span>
         </div>

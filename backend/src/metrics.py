@@ -1,4 +1,4 @@
-"""Prometheus metrics for Data Architecture Brain.
+"""Prometheus metrics for Data Capsule Server.
 
 Provides application-level metrics for monitoring and observability.
 Includes both standard HTTP metrics and custom business metrics.
