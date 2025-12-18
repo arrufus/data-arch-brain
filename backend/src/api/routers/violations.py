@@ -103,25 +103,41 @@ async def list_violations(
     category: Optional[str] = Query(None, description="Filter by rule category"),
     rule_set: Optional[str] = Query(None, description="Filter by rule set"),
     capsule_id: Optional[UUID] = Query(None, description="Filter by capsule ID"),
+    capsule_urn: Optional[str] = Query(None, description="Filter by capsule URN"),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     session: AsyncSession = Depends(get_session),
 ) -> ViolationListResponse:
     """List violations with optional filters."""
+    from src.repositories.capsule import CapsuleRepository
+
     repo = ViolationRepository(session)
-    
+
+    # If capsule_urn is provided, look up the capsule_id
+    resolved_capsule_id = capsule_id
+    if capsule_urn and not capsule_id:
+        capsule_repo = CapsuleRepository(session)
+        capsule = await capsule_repo.get_by_urn(capsule_urn)
+        if capsule:
+            resolved_capsule_id = capsule.id
+
     violations = await repo.list_violations(
         status=status,
         severity=severity,
         category=category,
         rule_set=rule_set,
-        capsule_id=capsule_id,
+        capsule_id=resolved_capsule_id,
         limit=limit,
         offset=offset,
     )
-    
-    total = await repo.count_violations(status=status, severity=severity)
-    
+
+    # Count with same filters for accurate pagination
+    total = await repo.count_violations(
+        status=status,
+        severity=severity,
+        capsule_id=resolved_capsule_id,
+    )
+
     return ViolationListResponse(
         violations=[_violation_to_response(v) for v in violations],
         total=total,

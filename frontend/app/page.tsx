@@ -114,7 +114,6 @@ export default function Home() {
           value={isLoadingViolations ? null : violationsData?.pagination?.total}
           icon={<AlertTriangle className="w-6 h-6" />}
           color="orange"
-          href="/violations"
           isLoading={isLoadingViolations}
         />
       </div>
@@ -145,14 +144,13 @@ export default function Home() {
             title="Check Violations"
             description="Review conformance issues"
             icon={<AlertTriangle className="w-5 h-5" />}
-            href="/violations"
+            href="/conformance"
           />
           <ActionCard
             title="Explore Lineage"
-            description="Trace data flow (Coming Soon)"
+            description="Trace data flow"
             icon={<GitBranch className="w-5 h-5" />}
             href="/lineage"
-            badge="P2"
           />
           <ActionCard
             title="API Documentation"
@@ -199,7 +197,7 @@ function StatCard({
   value: number | string | null | undefined;
   icon: React.ReactNode;
   color: 'blue' | 'red' | 'green' | 'orange';
-  href: string;
+  href?: string;
   isLoading: boolean;
 }) {
   const colorClasses = {
@@ -209,24 +207,36 @@ function StatCard({
     orange: 'bg-orange-50 text-orange-600',
   };
 
+  const content = (
+    <div className="flex items-center justify-between">
+      <div className="flex-1">
+        <p className="text-sm text-gray-600">{title}</p>
+        {isLoading ? (
+          <LoadingSkeleton className="h-8 w-20 mt-1" />
+        ) : (
+          <p className="text-2xl font-bold text-gray-900 mt-1">
+            {value ?? 0}
+          </p>
+        )}
+      </div>
+      <div className={`p-3 rounded-lg ${colorClasses[color]}`}>{icon}</div>
+    </div>
+  );
+
+  if (!href) {
+    return (
+      <div className="bg-white rounded-lg shadow p-6">
+        {content}
+      </div>
+    );
+  }
+
   return (
     <Link
       href={href}
       className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow"
     >
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <p className="text-sm text-gray-600">{title}</p>
-          {isLoading ? (
-            <LoadingSkeleton className="h-8 w-20 mt-1" />
-          ) : (
-            <p className="text-2xl font-bold text-gray-900 mt-1">
-              {value ?? 0}
-            </p>
-          )}
-        </div>
-        <div className={`p-3 rounded-lg ${colorClasses[color]}`}>{icon}</div>
-      </div>
+      {content}
     </Link>
   );
 }

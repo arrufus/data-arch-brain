@@ -19,6 +19,8 @@ services:
       - ENVIRONMENT=development
       - DATABASE_ECHO=true
     command: uvicorn src.api.main:app --host 0.0.0.0 --port 8002 --reload
+    networks:
+      - dcs-network
 
   # pgAdmin for database management
   pgadmin:

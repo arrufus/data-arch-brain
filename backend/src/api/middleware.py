@@ -82,7 +82,18 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Content-Security-Policy"] = "default-src 'self'"
+
+        # More permissive CSP for API docs (Swagger UI/ReDoc need CDN resources)
+        if request.url.path.endswith(("/docs", "/redoc")):
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline' cdn.jsdelivr.net; "
+                "style-src 'self' 'unsafe-inline' cdn.jsdelivr.net; "
+                "img-src 'self' data: cdn.jsdelivr.net; "
+                "font-src 'self' data: cdn.jsdelivr.net"
+            )
+        else:
+            response.headers["Content-Security-Policy"] = "default-src 'self'"
 
         return response
 
