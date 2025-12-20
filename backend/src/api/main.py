@@ -10,7 +10,34 @@ from src.api.auth import APIKeyAuthMiddleware
 from src.api.exceptions import register_exception_handlers
 from src.api.middleware import RequestLoggingMiddleware, SecurityHeadersMiddleware
 from src.api.rate_limit import configure_rate_limiting
-from src.api.routers import capsules, columns, compliance, conformance, domains, graph, health, ingest, products, redundancy, reports, tags, violations
+from src.api.routers import (
+    business_terms,
+    capsule_contracts,
+    capsule_versions,
+    capsules,
+    catalog,
+    column_profiles,
+    columns,
+    compliance,
+    conformance,
+    constraints,
+    data_policies,
+    domains,
+    graph,
+    health,
+    indexes,
+    ingest,
+    masking_rules,
+    products,
+    quality_rules,
+    redundancy,
+    reports,
+    sla_incidents,
+    tags,
+    transformation_code,
+    value_domains,
+    violations,
+)
 from src.cache import close_cache, init_cache
 from src.config import get_settings, validate_config
 from src.database import close_db, init_db, engine
@@ -126,6 +153,38 @@ OPENAPI_TAGS = [
         "description": "Column-level operations including lineage"
     },
     {
+        "name": "constraints",
+        "description": "Column constraint management - primary keys, foreign keys, unique, check, defaults"
+    },
+    {
+        "name": "indexes",
+        "description": "Capsule index management - B-tree, hash, GIN, GiST, BRIN indexes"
+    },
+    {
+        "name": "business-terms",
+        "description": "Business glossary - terms, definitions, approval workflow, associations"
+    },
+    {
+        "name": "value-domains",
+        "description": "Value domain management - enum, pattern, range, and reference data validation"
+    },
+    {
+        "name": "quality-rules",
+        "description": "Quality rule management - completeness, validity, uniqueness, consistency, timeliness checks"
+    },
+    {
+        "name": "column-profiles",
+        "description": "Column profiling - statistical metadata, value distributions, quality scores"
+    },
+    {
+        "name": "data-policies",
+        "description": "Data policy management - retention, masking, encryption, compliance frameworks"
+    },
+    {
+        "name": "masking-rules",
+        "description": "Masking rule management - redaction, tokenization, pseudonymization, role-based masking"
+    },
+    {
         "name": "compliance",
         "description": "PII compliance - inventory, exposure detection, and lineage tracing"
     },
@@ -160,6 +219,26 @@ OPENAPI_TAGS = [
     {
         "name": "reports",
         "description": "Report generation in various formats (JSON, CSV, HTML)"
+    },
+    {
+        "name": "catalog",
+        "description": "High-performance catalog views - aggregated summaries of capsules and columns across all 7 dimensions"
+    },
+    {
+        "name": "capsule-versions",
+        "description": "Capsule version tracking - schema evolution, breaking changes, and deployment history"
+    },
+    {
+        "name": "transformation-code",
+        "description": "Transformation code management - capture and track SQL, Python, and dbt transformations"
+    },
+    {
+        "name": "capsule-contracts",
+        "description": "Operational contracts - SLAs for freshness, completeness, quality, and support levels"
+    },
+    {
+        "name": "sla-incidents",
+        "description": "SLA incident management - track violations, resolutions, and root causes"
     },
 ]
 
@@ -216,6 +295,14 @@ def create_app() -> FastAPI:
     app.include_router(ingest.router, prefix=settings.api_prefix, tags=["ingestion"])
     app.include_router(capsules.router, prefix=settings.api_prefix, tags=["capsules"])
     app.include_router(columns.router, prefix=settings.api_prefix, tags=["columns"])
+    app.include_router(constraints.router, prefix=settings.api_prefix, tags=["constraints"])
+    app.include_router(indexes.router, prefix=settings.api_prefix, tags=["indexes"])
+    app.include_router(business_terms.router, prefix=settings.api_prefix, tags=["business-terms"])
+    app.include_router(value_domains.router, prefix=settings.api_prefix, tags=["value-domains"])
+    app.include_router(quality_rules.router, prefix=settings.api_prefix, tags=["quality-rules"])
+    app.include_router(column_profiles.router, prefix=settings.api_prefix, tags=["column-profiles"])
+    app.include_router(data_policies.router, prefix=settings.api_prefix, tags=["data-policies"])
+    app.include_router(masking_rules.router, prefix=settings.api_prefix, tags=["masking-rules"])
     app.include_router(compliance.router, prefix=settings.api_prefix, tags=["compliance"])
     app.include_router(conformance.router, prefix=settings.api_prefix, tags=["conformance"])
     app.include_router(violations.router, prefix=settings.api_prefix, tags=["violations"])
@@ -227,6 +314,15 @@ def create_app() -> FastAPI:
     app.include_router(graph.router, prefix=settings.api_prefix, tags=["graph"])
     app.include_router(redundancy.router, prefix=settings.api_prefix, tags=["redundancy"])
     app.include_router(reports.router, prefix=settings.api_prefix, tags=["reports"])
+
+    # Phase 7: Integration & Polish
+    app.include_router(catalog.router, prefix=settings.api_prefix, tags=["catalog"])
+
+    # Phase 5-6: Provenance and Contracts
+    app.include_router(capsule_versions.router, prefix=settings.api_prefix, tags=["capsule-versions"])
+    app.include_router(transformation_code.router, prefix=settings.api_prefix, tags=["transformation-code"])
+    app.include_router(capsule_contracts.router, prefix=settings.api_prefix, tags=["capsule-contracts"])
+    app.include_router(sla_incidents.router, prefix=settings.api_prefix, tags=["sla-incidents"])
 
     # Register exception handlers
     register_exception_handlers(app)

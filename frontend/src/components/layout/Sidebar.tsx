@@ -82,7 +82,6 @@ const navItems: NavItem[] = [
     href: '/redundancy',
     label: 'Redundancy',
     icon: <Copy className="w-5 h-5" />,
-    badge: 'P3',
   },
   {
     href: '/reports',
@@ -134,14 +133,6 @@ export default function Sidebar() {
           );
         })}
       </nav>
-
-      {/* Info Section */}
-      <div className="p-4 mt-8 border-t border-gray-200">
-        <div className="text-xs text-gray-500 space-y-1">
-          <p className="font-medium text-gray-700">Quick Stats</p>
-          <p>Loading...</p>
-        </div>
-      </div>
     </aside>
   );
 }

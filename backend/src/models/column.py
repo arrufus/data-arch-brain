@@ -4,14 +4,20 @@ from enum import Enum
 from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import DCSBase, JSONType, URNMixin, fk_ref
 
 if TYPE_CHECKING:
+    from src.models.business_term import ColumnBusinessTerm
     from src.models.capsule import Capsule
+    from src.models.column_profile import ColumnProfile
+    from src.models.constraint import ColumnConstraint
+    from src.models.data_policy import DataPolicy
     from src.models.lineage import ColumnLineage
+    from src.models.masking_rule import MaskingRule
+    from src.models.quality_rule import QualityRule
     from src.models.tag import ColumnTag
     from src.models.violation import Violation
 
@@ -86,6 +92,29 @@ class Column(DCSBase, URNMixin):
     # Documentation
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # Phase 2: Semantic metadata extensions
+    unit_of_measure: Mapped[Optional[str]] = mapped_column(
+        String(100), nullable=True, comment="Physical unit or currency (ISO 4217, SI units)"
+    )
+    value_domain: Mapped[Optional[str]] = mapped_column(
+        String(100), nullable=True, comment="Reference to controlled vocabulary or enum type"
+    )
+    value_range_min: Mapped[Optional[float]] = mapped_column(
+        Float, nullable=True, comment="Minimum expected value"
+    )
+    value_range_max: Mapped[Optional[float]] = mapped_column(
+        Float, nullable=True, comment="Maximum expected value"
+    )
+    allowed_values: Mapped[Optional[list]] = mapped_column(
+        JSONType(), nullable=True, comment="Enumerated list of valid values"
+    )
+    format_pattern: Mapped[Optional[str]] = mapped_column(
+        String(255), nullable=True, comment="Expected format (regex or pattern)"
+    )
+    example_values: Mapped[list] = mapped_column(
+        JSONType(), default=list, nullable=False, comment="Example values for documentation"
+    )
+
     # Metadata
     meta: Mapped[dict] = mapped_column(JSONType(), default=dict, nullable=False)
     tags: Mapped[list] = mapped_column(JSONType(), default=list, nullable=False)
@@ -118,7 +147,52 @@ class Column(DCSBase, URNMixin):
         back_populates="column", cascade="all, delete-orphan"
     )
 
+    # Phase 1: Constraint relationships
+    constraints: Mapped[list["ColumnConstraint"]] = relationship(
+        back_populates="column", cascade="all, delete-orphan"
+    )
+
+    # Phase 2: Business term associations
+    business_term_associations: Mapped[list["ColumnBusinessTerm"]] = relationship(
+        back_populates="column", cascade="all, delete-orphan"
+    )
+
+    # Phase 3: Quality expectations
+    quality_rules: Mapped[list["QualityRule"]] = relationship(
+        back_populates="column",
+        cascade="all, delete-orphan",
+        foreign_keys="QualityRule.column_id",
+    )
+    profiles: Mapped[list["ColumnProfile"]] = relationship(
+        back_populates="column", cascade="all, delete-orphan"
+    )
+
+    # Phase 4: Policy metadata
+    data_policies: Mapped[list["DataPolicy"]] = relationship(
+        back_populates="column",
+        cascade="all, delete-orphan",
+        foreign_keys="DataPolicy.column_id",
+    )
+    masking_rules: Mapped[list["MaskingRule"]] = relationship(
+        back_populates="column", cascade="all, delete-orphan"
+    )
+
     @property
     def is_pii(self) -> bool:
         """Check if column is PII."""
         return self.semantic_type == SemanticType.PII.value or self.pii_type is not None
+
+    @property
+    def has_constraints(self) -> bool:
+        """Check if column has any constraints."""
+        return len(self.constraints) > 0
+
+    @property
+    def is_primary_key(self) -> bool:
+        """Check if column is part of primary key."""
+        return any(c.constraint_type == "primary_key" for c in self.constraints)
+
+    @property
+    def is_foreign_key(self) -> bool:
+        """Check if column is a foreign key."""
+        return any(c.constraint_type == "foreign_key" for c in self.constraints)
