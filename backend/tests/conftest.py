@@ -21,6 +21,10 @@ from src.api.rate_limit import reset_limiter
 from src.config import Settings, get_settings
 from src.database import Base, get_db
 
+# Import all models to register them with Base.metadata
+# This must happen before any table creation operations
+import src.models  # noqa: F401
+
 
 # Test database URL (use in-memory SQLite for unit tests)
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
@@ -122,9 +126,19 @@ async def test_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
 def _create_test_app():
     """Create a test FastAPI app with test settings."""
     import importlib
+    from prometheus_client import REGISTRY
 
     # Reset rate limiter to pick up test settings
     reset_limiter()
+
+    # Clear Prometheus registry to avoid duplication on reload
+    # This prevents "Duplicated timeseries in CollectorRegistry" errors
+    collectors = list(REGISTRY._collector_to_names.keys())
+    for collector in collectors:
+        try:
+            REGISTRY.unregister(collector)
+        except Exception:
+            pass  # Ignore errors if collector already unregistered
 
     # Patch get_settings before importing create_app
     with patch("src.api.main.get_settings", get_test_settings):
@@ -134,6 +148,9 @@ def _create_test_app():
                 import src.api.rate_limit as rate_limit_module
                 importlib.reload(rate_limit_module)
                 reset_limiter()
+                # Reload metrics module to reset global _metrics variable
+                import src.metrics as metrics_module
+                importlib.reload(metrics_module)
                 # Then reload conformance module to use the new limiter
                 import src.api.routers.conformance as conformance_module
                 importlib.reload(conformance_module)

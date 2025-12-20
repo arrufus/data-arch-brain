@@ -5,6 +5,7 @@ from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from src.api.middleware import sanitize_search_query
 from src.models.domain import Domain, Owner
@@ -41,15 +42,38 @@ class DomainRepository(BaseRepository[Domain]):
         await self.session.refresh(domain)
         return domain, True
 
+    async def get_all(
+        self,
+        offset: int = 0,
+        limit: int = 100,
+    ) -> Sequence[Domain]:
+        """Get all domains with owner relationship loaded."""
+        stmt = (
+            select(Domain)
+            .options(selectinload(Domain.owner))
+            .offset(offset)
+            .limit(limit)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
     async def get_root_domains(self) -> Sequence[Domain]:
         """Get all root-level domains (no parent)."""
-        stmt = select(Domain).where(Domain.parent_id.is_(None))
+        stmt = (
+            select(Domain)
+            .options(selectinload(Domain.owner))
+            .where(Domain.parent_id.is_(None))
+        )
         result = await self.session.execute(stmt)
         return result.scalars().all()
 
     async def get_children(self, parent_id: UUID) -> Sequence[Domain]:
         """Get child domains of a parent."""
-        stmt = select(Domain).where(Domain.parent_id == parent_id)
+        stmt = (
+            select(Domain)
+            .options(selectinload(Domain.owner))
+            .where(Domain.parent_id == parent_id)
+        )
         result = await self.session.execute(stmt)
         return result.scalars().all()
 
@@ -68,6 +92,7 @@ class DomainRepository(BaseRepository[Domain]):
         search_pattern = f"%{safe_query}%"
         stmt = (
             select(Domain)
+            .options(selectinload(Domain.owner))
             .where(
                 Domain.name.ilike(search_pattern)
                 | Domain.description.ilike(search_pattern)

@@ -123,7 +123,7 @@ export default function LineagePage() {
                         placeholder="Type to search..."
                         value={capsuleSearch}
                         onChange={(e) => setCapsuleSearch(e.target.value)}
-                        className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         autoFocus
                       />
                     </div>

@@ -69,6 +69,11 @@ class CapsuleLineage(Base):
     ingestion_job: Mapped[Optional["IngestionJob"]] = relationship(
         back_populates="capsule_lineage_edges"
     )
+    transformation_codes: Mapped[list["TransformationCode"]] = relationship(
+        back_populates="lineage_edge",
+        cascade="all, delete-orphan",
+        foreign_keys="TransformationCode.lineage_edge_id",
+    )
 
 
 class ColumnLineage(Base):

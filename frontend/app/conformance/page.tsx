@@ -394,7 +394,7 @@ function ViolationsTab({
           <select
             value={selectedSeverity || ''}
             onChange={(e) => onSeverityChange(e.target.value || null)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="px-3 py-2 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">All Severities</option>
             <option value="critical">Critical</option>
@@ -409,7 +409,7 @@ function ViolationsTab({
           <select
             value={selectedCategory || ''}
             onChange={(e) => onCategoryChange(e.target.value || null)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="px-3 py-2 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">All Categories</option>
             <option value="naming">Naming</option>
@@ -530,7 +530,7 @@ function RulesTab({
             <select
               value={selectedRuleSet || ''}
               onChange={(e) => setSelectedRuleSet(e.target.value || null)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="px-3 py-2 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">All Rule Sets</option>
               {ruleSets.map((ruleSet) => (

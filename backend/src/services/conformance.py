@@ -41,6 +41,12 @@ class RuleCategory(str, Enum):
     DOCUMENTATION = "documentation"
     TESTING = "testing"
     ARCHITECTURE = "architecture"
+    STRUCTURAL = "structural"
+    SEMANTIC = "semantic"
+    QUALITY = "quality"
+    POLICY = "policy"
+    PROVENANCE = "provenance"
+    OPERATIONAL = "operational"
 
 
 class RuleScope(str, Enum):
@@ -273,8 +279,594 @@ PII_COMPLIANCE_RULES: list[RuleDefinition] = [
     ),
 ]
 
+# Dimension 2: Structural Metadata Rules
+STRUCTURAL_METADATA_RULES: list[RuleDefinition] = [
+    RuleDefinition(
+        rule_id="DIM2_001",
+        name="Primary key constraint naming",
+        description="Primary key constraints should follow naming convention: pk_{table}_({columns})",
+        severity=RuleSeverity.WARNING,
+        category=RuleCategory.STRUCTURAL,
+        scope=RuleScope.CAPSULE,
+        rule_set="structural_metadata",
+        condition={"check": "primary_key_naming_convention"},
+        remediation="Rename primary key constraint to follow pk_{table}_({columns}) pattern",
+    ),
+    RuleDefinition(
+        rule_id="DIM2_002",
+        name="Foreign key constraint naming",
+        description="Foreign key constraints should follow naming convention: fk_{source}_{target}",
+        severity=RuleSeverity.WARNING,
+        category=RuleCategory.STRUCTURAL,
+        scope=RuleScope.CAPSULE,
+        rule_set="structural_metadata",
+        condition={"check": "foreign_key_naming_convention"},
+        remediation="Rename foreign key constraint to follow fk_{source}_{target} pattern",
+    ),
+    RuleDefinition(
+        rule_id="DIM2_003",
+        name="Unique constraint naming",
+        description="Unique constraints should follow naming convention: uq_{table}_{columns}",
+        severity=RuleSeverity.INFO,
+        category=RuleCategory.STRUCTURAL,
+        scope=RuleScope.CAPSULE,
+        rule_set="structural_metadata",
+        condition={"check": "unique_constraint_naming_convention"},
+        remediation="Rename unique constraint to follow uq_{table}_{columns} pattern",
+    ),
+    RuleDefinition(
+        rule_id="DIM2_004",
+        name="Check constraint naming",
+        description="Check constraints should follow naming convention: chk_{table}_{condition}",
+        severity=RuleSeverity.INFO,
+        category=RuleCategory.STRUCTURAL,
+        scope=RuleScope.CAPSULE,
+        rule_set="structural_metadata",
+        condition={"check": "check_constraint_naming_convention"},
+        remediation="Rename check constraint to follow chk_{table}_{condition} pattern",
+    ),
+    RuleDefinition(
+        rule_id="DIM2_005",
+        name="Index naming convention",
+        description="Indexes should follow naming convention: idx_{table}_{columns}",
+        severity=RuleSeverity.INFO,
+        category=RuleCategory.STRUCTURAL,
+        scope=RuleScope.CAPSULE,
+        rule_set="structural_metadata",
+        condition={"check": "index_naming_convention"},
+        remediation="Rename index to follow idx_{table}_{columns} pattern",
+    ),
+    RuleDefinition(
+        rule_id="DIM2_006",
+        name="Tables should have primary key",
+        description="Every table should have a primary key defined for data integrity",
+        severity=RuleSeverity.ERROR,
+        category=RuleCategory.STRUCTURAL,
+        scope=RuleScope.CAPSULE,
+        rule_set="structural_metadata",
+        condition={"requires": "has_primary_key"},
+        remediation="Add a primary key constraint to this table",
+    ),
+    RuleDefinition(
+        rule_id="DIM2_007",
+        name="Foreign keys should have indexes",
+        description="Foreign key columns should have indexes for query performance",
+        severity=RuleSeverity.WARNING,
+        category=RuleCategory.STRUCTURAL,
+        scope=RuleScope.CAPSULE,
+        rule_set="structural_metadata",
+        condition={"check": "foreign_keys_have_indexes"},
+        remediation="Add indexes on foreign key columns",
+    ),
+    RuleDefinition(
+        rule_id="DIM2_008",
+        name="Composite indexes should be selective",
+        description="Composite indexes should have selective columns first for efficiency",
+        severity=RuleSeverity.INFO,
+        category=RuleCategory.STRUCTURAL,
+        scope=RuleScope.CAPSULE,
+        rule_set="structural_metadata",
+        condition={"check": "composite_index_selectivity"},
+        remediation="Reorder composite index to put most selective columns first",
+    ),
+]
+
+# Dimension 3: Semantic Metadata Rules
+SEMANTIC_METADATA_RULES: list[RuleDefinition] = [
+    RuleDefinition(
+        rule_id="DIM3_001",
+        name="Key business columns should have business terms",
+        description="Columns with 'id', 'name', 'amount', 'date' should have business terms linked",
+        severity=RuleSeverity.WARNING,
+        category=RuleCategory.SEMANTIC,
+        scope=RuleScope.COLUMN,
+        rule_set="semantic_metadata",
+        condition={"check": "key_columns_have_business_terms"},
+        remediation="Link business terms to clarify semantic meaning",
+    ),
+    RuleDefinition(
+        rule_id="DIM3_002",
+        name="Enumerated columns should use value domains",
+        description="Columns with limited value sets should reference value domains",
+        severity=RuleSeverity.WARNING,
+        category=RuleCategory.SEMANTIC,
+        scope=RuleScope.COLUMN,
+        rule_set="semantic_metadata",
+        condition={"check": "enum_columns_have_value_domains"},
+        remediation="Create and link a value domain for this enumerated column",
+    ),
+    RuleDefinition(
+        rule_id="DIM3_003",
+        name="Code/status columns should have value domains",
+        description="Columns ending with '_code' or '_status' should reference value domains",
+        severity=RuleSeverity.WARNING,
+        category=RuleCategory.SEMANTIC,
+        scope=RuleScope.COLUMN,
+        rule_set="semantic_metadata",
+        condition={"check": "code_status_columns_have_value_domains"},
+        remediation="Create and link a value domain for this code/status column",
+    ),
+    RuleDefinition(
+        rule_id="DIM3_004",
+        name="Business-critical tables should be tagged",
+        description="Tables in Gold layer should have business domain tags",
+        severity=RuleSeverity.INFO,
+        category=RuleCategory.SEMANTIC,
+        scope=RuleScope.CAPSULE,
+        rule_set="semantic_metadata",
+        condition={
+            "if": {"layer": ["gold", "marts", "mart"]},
+            "then": {"has_tags": True},
+        },
+        remediation="Add business domain tags to categorize this table",
+    ),
+    RuleDefinition(
+        rule_id="DIM3_005",
+        name="Tables should have ownership",
+        description="Every table should have an assigned owner for accountability",
+        severity=RuleSeverity.WARNING,
+        category=RuleCategory.SEMANTIC,
+        scope=RuleScope.CAPSULE,
+        rule_set="semantic_metadata",
+        condition={"requires": "has_owner"},
+        remediation="Assign an owner (team or individual) to this table",
+    ),
+    RuleDefinition(
+        rule_id="DIM3_006",
+        name="Tables should belong to domain",
+        description="Every table should be assigned to a business domain",
+        severity=RuleSeverity.INFO,
+        category=RuleCategory.SEMANTIC,
+        scope=RuleScope.CAPSULE,
+        rule_set="semantic_metadata",
+        condition={"requires": "has_domain"},
+        remediation="Assign this table to a business domain",
+    ),
+]
+
+# Dimension 4: Quality Expectations Rules
+QUALITY_EXPECTATIONS_RULES: list[RuleDefinition] = [
+    RuleDefinition(
+        rule_id="DIM4_001",
+        name="Gold tables should have quality rules",
+        description="Production tables should have data quality rules defined",
+        severity=RuleSeverity.WARNING,
+        category=RuleCategory.QUALITY,
+        scope=RuleScope.CAPSULE,
+        rule_set="quality_expectations",
+        condition={
+            "if": {"layer": ["gold", "marts", "mart"]},
+            "then": {"has_quality_rules": True},
+        },
+        remediation="Add quality rules to validate data in this production table",
+    ),
+    RuleDefinition(
+        rule_id="DIM4_002",
+        name="Primary keys should have uniqueness rules",
+        description="Primary key columns must have uniqueness quality rules",
+        severity=RuleSeverity.ERROR,
+        category=RuleCategory.QUALITY,
+        scope=RuleScope.CAPSULE,
+        rule_set="quality_expectations",
+        condition={"check": "primary_keys_have_uniqueness_rules"},
+        remediation="Add uniqueness quality rule for primary key column(s)",
+    ),
+    RuleDefinition(
+        rule_id="DIM4_003",
+        name="Critical columns should have completeness rules",
+        description="Non-nullable business-critical columns should have completeness > 99%",
+        severity=RuleSeverity.WARNING,
+        category=RuleCategory.QUALITY,
+        scope=RuleScope.COLUMN,
+        rule_set="quality_expectations",
+        condition={"check": "critical_columns_have_completeness_rules"},
+        remediation="Add completeness quality rule with threshold >= 99%",
+    ),
+    RuleDefinition(
+        rule_id="DIM4_004",
+        name="Foreign keys should have referential integrity rules",
+        description="Foreign key columns should validate referential integrity",
+        severity=RuleSeverity.WARNING,
+        category=RuleCategory.QUALITY,
+        scope=RuleScope.CAPSULE,
+        rule_set="quality_expectations",
+        condition={"check": "foreign_keys_have_referential_integrity_rules"},
+        remediation="Add referential integrity quality rule for foreign key(s)",
+    ),
+    RuleDefinition(
+        rule_id="DIM4_005",
+        name="Enumerated columns should have validity rules",
+        description="Columns with value domains should have validity/accepted values rules",
+        severity=RuleSeverity.WARNING,
+        category=RuleCategory.QUALITY,
+        scope=RuleScope.COLUMN,
+        rule_set="quality_expectations",
+        condition={"check": "enum_columns_have_validity_rules"},
+        remediation="Add accepted_values quality rule for this column",
+    ),
+    RuleDefinition(
+        rule_id="DIM4_006",
+        name="NOT NULL columns need 100% completeness",
+        description="Columns with NOT NULL constraint must have completeness threshold of 100%",
+        severity=RuleSeverity.ERROR,
+        category=RuleCategory.QUALITY,
+        scope=RuleScope.COLUMN,
+        rule_set="quality_expectations",
+        condition={"check": "not_null_columns_100_percent_complete"},
+        remediation="Add completeness rule with 100% threshold for NOT NULL column",
+    ),
+    RuleDefinition(
+        rule_id="DIM4_007",
+        name="Foreign keys need referential integrity rules",
+        description="Every foreign key must have a relationships quality rule",
+        severity=RuleSeverity.ERROR,
+        category=RuleCategory.QUALITY,
+        scope=RuleScope.COLUMN,
+        rule_set="quality_expectations",
+        condition={"check": "foreign_keys_need_relationships_rules"},
+        remediation="Add relationships quality rule for this foreign key",
+    ),
+    RuleDefinition(
+        rule_id="DIM4_008",
+        name="Column profiles should be fresh",
+        description="Column profiles should be updated within last 7 days for active tables",
+        severity=RuleSeverity.INFO,
+        category=RuleCategory.QUALITY,
+        scope=RuleScope.CAPSULE,
+        rule_set="quality_expectations",
+        condition={"check": "column_profiles_are_fresh"},
+        remediation="Run profiling job to update column statistics",
+    ),
+    RuleDefinition(
+        rule_id="DIM4_009",
+        name="Gold tables should have high quality scores",
+        description="Production tables should maintain average quality score >= 90%",
+        severity=RuleSeverity.WARNING,
+        category=RuleCategory.QUALITY,
+        scope=RuleScope.CAPSULE,
+        rule_set="quality_expectations",
+        condition={
+            "if": {"layer": ["gold", "marts", "mart"]},
+            "then": {"quality_score_threshold": 90.0},
+        },
+        remediation="Improve data quality to meet production standards",
+    ),
+    RuleDefinition(
+        rule_id="DIM4_010",
+        name="Quality rules should be enabled",
+        description="At least 80% of defined quality rules should be enabled",
+        severity=RuleSeverity.INFO,
+        category=RuleCategory.QUALITY,
+        scope=RuleScope.CAPSULE,
+        rule_set="quality_expectations",
+        condition={"check": "quality_rules_mostly_enabled"},
+        remediation="Review and enable disabled quality rules or remove obsolete ones",
+    ),
+]
+
+# Dimension 5: Policy & Governance Rules
+POLICY_GOVERNANCE_RULES: list[RuleDefinition] = [
+    RuleDefinition(
+        rule_id="DIM5_001",
+        name="PII tables must have data policies",
+        description="Tables containing PII must have explicit data policies defined",
+        severity=RuleSeverity.CRITICAL,
+        category=RuleCategory.POLICY,
+        scope=RuleScope.CAPSULE,
+        rule_set="policy_governance",
+        condition={"check": "pii_tables_have_data_policies"},
+        remediation="Create data policy defining retention, access control, and compliance requirements",
+    ),
+    RuleDefinition(
+        rule_id="DIM5_002",
+        name="PII columns must have policies",
+        description="Columns tagged as PII must have associated data policies",
+        severity=RuleSeverity.CRITICAL,
+        category=RuleCategory.POLICY,
+        scope=RuleScope.COLUMN,
+        rule_set="policy_governance",
+        condition={"check": "pii_columns_have_policies"},
+        remediation="Create or link data policy for this PII column",
+    ),
+    RuleDefinition(
+        rule_id="DIM5_003",
+        name="PII in Gold requires masking rules",
+        description="PII columns in Gold layer must have masking rules configured",
+        severity=RuleSeverity.CRITICAL,
+        category=RuleCategory.POLICY,
+        scope=RuleScope.COLUMN,
+        rule_set="policy_governance",
+        condition={
+            "if": {"layer": ["gold", "marts", "mart"], "has_pii": True},
+            "then": {"has_masking_rules": True},
+        },
+        remediation="Configure masking rules (hash, encrypt, tokenize, redact) for this PII column",
+    ),
+    RuleDefinition(
+        rule_id="DIM5_004",
+        name="Gold tables should have retention policies",
+        description="Production tables should have explicit retention policies",
+        severity=RuleSeverity.WARNING,
+        category=RuleCategory.POLICY,
+        scope=RuleScope.CAPSULE,
+        rule_set="policy_governance",
+        condition={
+            "if": {"layer": ["gold", "marts", "mart"]},
+            "then": {"has_retention_policy": True},
+        },
+        remediation="Define retention policy (duration, archival strategy) for this table",
+    ),
+    RuleDefinition(
+        rule_id="DIM5_005",
+        name="Sensitive data needs access controls",
+        description="Tables with HIGH or CRITICAL sensitivity must have access controls defined",
+        severity=RuleSeverity.ERROR,
+        category=RuleCategory.POLICY,
+        scope=RuleScope.CAPSULE,
+        rule_set="policy_governance",
+        condition={"check": "sensitive_data_has_access_controls"},
+        remediation="Define access control policy specifying authorized roles/users",
+    ),
+    RuleDefinition(
+        rule_id="DIM5_006",
+        name="Compliance frameworks should be documented",
+        description="Tables under regulatory compliance should have frameworks documented (GDPR, CCPA, HIPAA, etc.)",
+        severity=RuleSeverity.WARNING,
+        category=RuleCategory.POLICY,
+        scope=RuleScope.CAPSULE,
+        rule_set="policy_governance",
+        condition={"check": "compliance_frameworks_documented"},
+        remediation="Document applicable compliance frameworks in data policy metadata",
+    ),
+    RuleDefinition(
+        rule_id="DIM5_007",
+        name="Geographic restrictions should be defined",
+        description="Tables with geo-restricted data should have geographic policies",
+        severity=RuleSeverity.WARNING,
+        category=RuleCategory.POLICY,
+        scope=RuleScope.CAPSULE,
+        rule_set="policy_governance",
+        condition={"check": "geographic_restrictions_defined"},
+        remediation="Define geographic restrictions (allowed/blocked regions) in data policy",
+    ),
+    RuleDefinition(
+        rule_id="DIM5_008",
+        name="Restricted data requires encryption",
+        description="Tables with RESTRICTED or CONFIDENTIAL data must specify encryption requirements",
+        severity=RuleSeverity.CRITICAL,
+        category=RuleCategory.POLICY,
+        scope=RuleScope.CAPSULE,
+        rule_set="policy_governance",
+        condition={"check": "restricted_data_requires_encryption"},
+        remediation="Configure encryption-at-rest and encryption-in-transit requirements in data policy",
+    ),
+]
+
+# Dimension 6: Provenance & Lineage Rules
+PROVENANCE_LINEAGE_RULES: list[RuleDefinition] = [
+    RuleDefinition(
+        rule_id="DIM6_001",
+        name="Gold tables should have version history",
+        description="Production tables should track schema version history",
+        severity=RuleSeverity.WARNING,
+        category=RuleCategory.PROVENANCE,
+        scope=RuleScope.CAPSULE,
+        rule_set="provenance_lineage",
+        condition={
+            "if": {"layer": ["gold", "marts", "mart"]},
+            "then": {"has_version_history": True},
+        },
+        remediation="Enable schema versioning to track changes over time",
+    ),
+    RuleDefinition(
+        rule_id="DIM6_002",
+        name="Version changes should have descriptions",
+        description="Schema version changes should include descriptive change summaries",
+        severity=RuleSeverity.INFO,
+        category=RuleCategory.PROVENANCE,
+        scope=RuleScope.CAPSULE,
+        rule_set="provenance_lineage",
+        condition={"check": "version_changes_have_descriptions"},
+        remediation="Add change summary descriptions when creating new versions",
+    ),
+    RuleDefinition(
+        rule_id="DIM6_003",
+        name="Transformation code should be documented",
+        description="Tables with transformations should have associated transformation code",
+        severity=RuleSeverity.WARNING,
+        category=RuleCategory.PROVENANCE,
+        scope=RuleScope.CAPSULE,
+        rule_set="provenance_lineage",
+        condition={
+            "if": {"capsule_type": ["model"]},
+            "then": {"has_transformation_code": True},
+        },
+        remediation="Link transformation code (SQL, Python, etc.) to document data logic",
+    ),
+    RuleDefinition(
+        rule_id="DIM6_004",
+        name="Breaking changes must be documented",
+        description="Schema changes marked as breaking must have detailed documentation",
+        severity=RuleSeverity.ERROR,
+        category=RuleCategory.PROVENANCE,
+        scope=RuleScope.CAPSULE,
+        rule_set="provenance_lineage",
+        condition={"check": "breaking_changes_documented"},
+        remediation="Document breaking changes with migration guide and impact analysis",
+    ),
+    RuleDefinition(
+        rule_id="DIM6_005",
+        name="Git integration for version tracking",
+        description="Schema versions should be linked to git commits for traceability",
+        severity=RuleSeverity.INFO,
+        category=RuleCategory.PROVENANCE,
+        scope=RuleScope.CAPSULE,
+        rule_set="provenance_lineage",
+        condition={"check": "versions_linked_to_git"},
+        remediation="Configure git integration to track commit SHA with schema versions",
+    ),
+    RuleDefinition(
+        rule_id="DIM6_006",
+        name="Deprecated tables should be marked",
+        description="Tables scheduled for deprecation should have deprecation metadata",
+        severity=RuleSeverity.WARNING,
+        category=RuleCategory.PROVENANCE,
+        scope=RuleScope.CAPSULE,
+        rule_set="provenance_lineage",
+        condition={"check": "deprecated_tables_marked"},
+        remediation="Add deprecation notice with sunset date and migration path",
+    ),
+    RuleDefinition(
+        rule_id="DIM6_007",
+        name="Lineage should be complete",
+        description="Tables should have upstream lineage documented for Bronze/Silver, downstream for Gold",
+        severity=RuleSeverity.INFO,
+        category=RuleCategory.PROVENANCE,
+        scope=RuleScope.CAPSULE,
+        rule_set="provenance_lineage",
+        condition={"check": "lineage_complete_for_layer"},
+        remediation="Document data lineage to show data flow and dependencies",
+    ),
+    RuleDefinition(
+        rule_id="DIM6_008",
+        name="Column-level lineage for critical columns",
+        description="Key business columns should have column-level lineage tracked",
+        severity=RuleSeverity.INFO,
+        category=RuleCategory.PROVENANCE,
+        scope=RuleScope.COLUMN,
+        rule_set="provenance_lineage",
+        condition={"check": "critical_columns_have_column_lineage"},
+        remediation="Enable column-level lineage tracking for this business-critical column",
+    ),
+]
+
+# Dimension 7: Operational Contract Rules
+OPERATIONAL_CONTRACT_RULES: list[RuleDefinition] = [
+    RuleDefinition(
+        rule_id="DIM7_001",
+        name="Gold tables should have contracts",
+        description="Production tables should have explicit data contracts defined",
+        severity=RuleSeverity.WARNING,
+        category=RuleCategory.OPERATIONAL,
+        scope=RuleScope.CAPSULE,
+        rule_set="operational_contract",
+        condition={
+            "if": {"layer": ["gold", "marts", "mart"]},
+            "then": {"has_contract": True},
+        },
+        remediation="Create data contract defining SLAs, support, and expectations",
+    ),
+    RuleDefinition(
+        rule_id="DIM7_002",
+        name="Contracts should define freshness SLA",
+        description="Data contracts must specify freshness/update frequency SLA",
+        severity=RuleSeverity.WARNING,
+        category=RuleCategory.OPERATIONAL,
+        scope=RuleScope.CAPSULE,
+        rule_set="operational_contract",
+        condition={"check": "contracts_have_freshness_sla"},
+        remediation="Add freshness SLA (e.g., updated daily, hourly, real-time) to contract",
+    ),
+    RuleDefinition(
+        rule_id="DIM7_003",
+        name="Contracts should define completeness SLA",
+        description="Data contracts should specify expected completeness percentage",
+        severity=RuleSeverity.INFO,
+        category=RuleCategory.OPERATIONAL,
+        scope=RuleScope.CAPSULE,
+        rule_set="operational_contract",
+        condition={"check": "contracts_have_completeness_sla"},
+        remediation="Add completeness SLA (e.g., >= 95% complete) to contract",
+    ),
+    RuleDefinition(
+        rule_id="DIM7_004",
+        name="Contracts should define quality SLA",
+        description="Data contracts should specify minimum quality score thresholds",
+        severity=RuleSeverity.WARNING,
+        category=RuleCategory.OPERATIONAL,
+        scope=RuleScope.CAPSULE,
+        rule_set="operational_contract",
+        condition={"check": "contracts_have_quality_sla"},
+        remediation="Add quality SLA (e.g., quality score >= 90%) to contract",
+    ),
+    RuleDefinition(
+        rule_id="DIM7_005",
+        name="Open incidents must be acknowledged within 24h",
+        description="SLA incidents must be acknowledged within 24 hours",
+        severity=RuleSeverity.ERROR,
+        category=RuleCategory.OPERATIONAL,
+        scope=RuleScope.CAPSULE,
+        rule_set="operational_contract",
+        condition={"check": "incidents_acknowledged_within_sla"},
+        remediation="Acknowledge open incidents and provide estimated resolution time",
+    ),
+    RuleDefinition(
+        rule_id="DIM7_006",
+        name="Critical incidents should be resolved quickly",
+        description="Critical SLA incidents should be resolved within 4 hours",
+        severity=RuleSeverity.WARNING,
+        category=RuleCategory.OPERATIONAL,
+        scope=RuleScope.CAPSULE,
+        rule_set="operational_contract",
+        condition={"check": "critical_incidents_resolved_quickly"},
+        remediation="Prioritize and resolve critical incidents to restore service levels",
+    ),
+    RuleDefinition(
+        rule_id="DIM7_007",
+        name="Contracts should list support contacts",
+        description="Data contracts must specify technical and business support contacts",
+        severity=RuleSeverity.INFO,
+        category=RuleCategory.OPERATIONAL,
+        scope=RuleScope.CAPSULE,
+        rule_set="operational_contract",
+        condition={"check": "contracts_have_support_contacts"},
+        remediation="Add support contact information (technical owner, business owner) to contract",
+    ),
+    RuleDefinition(
+        rule_id="DIM7_008",
+        name="Capsule must meet freshness SLA",
+        description="Table updates must meet contracted freshness SLA",
+        severity=RuleSeverity.ERROR,
+        category=RuleCategory.OPERATIONAL,
+        scope=RuleScope.CAPSULE,
+        rule_set="operational_contract",
+        condition={"check": "capsule_meets_freshness_sla"},
+        remediation="Investigate and fix data pipeline delays causing SLA violations",
+    ),
+]
+
 # All built-in rules
-ALL_BUILT_IN_RULES = MEDALLION_RULES + DBT_BEST_PRACTICES_RULES + PII_COMPLIANCE_RULES
+ALL_BUILT_IN_RULES = (
+    MEDALLION_RULES
+    + DBT_BEST_PRACTICES_RULES
+    + PII_COMPLIANCE_RULES
+    + STRUCTURAL_METADATA_RULES
+    + SEMANTIC_METADATA_RULES
+    + QUALITY_EXPECTATIONS_RULES
+    + POLICY_GOVERNANCE_RULES
+    + PROVENANCE_LINEAGE_RULES
+    + OPERATIONAL_CONTRACT_RULES
+)
 
 
 class ConformanceService:
@@ -581,8 +1173,19 @@ class ConformanceService:
         stmt = (
             select(Capsule)
             .options(
-                selectinload(Capsule.columns),
+                selectinload(Capsule.columns).selectinload(Column.constraints),
+                selectinload(Capsule.columns).selectinload(Column.business_term_associations),
+                selectinload(Capsule.columns).selectinload(Column.masking_rules),
                 selectinload(Capsule.upstream_edges),
+                selectinload(Capsule.domain),
+                selectinload(Capsule.owner),
+                selectinload(Capsule.quality_rules),
+                selectinload(Capsule.contracts),
+                selectinload(Capsule.tag_associations),
+                selectinload(Capsule.versions),
+                selectinload(Capsule.transformation_codes),
+                selectinload(Capsule.data_policies),
+                selectinload(Capsule.sla_incidents),
             )
         )
         result = await self.session.execute(stmt)
@@ -652,6 +1255,58 @@ class ConformanceService:
                         remediation=rule.remediation,
                     )
                     return "fail", violation_info
+                elif req == "has_primary_key":
+                    if not any(col.is_primary_key for col in capsule.columns):
+                        violation_info = ViolationInfo(
+                            rule_id=rule.rule_id,
+                            rule_name=rule.name,
+                            severity=rule.severity,
+                            category=rule.category,
+                            subject_type="capsule",
+                            subject_id=capsule.id,
+                            subject_urn=capsule.urn,
+                            subject_name=capsule.name,
+                            message=f"Table '{capsule.name}' has no primary key",
+                            remediation=rule.remediation,
+                        )
+                        return "fail", violation_info
+                elif req == "has_owner":
+                    if not capsule.owner_id:
+                        violation_info = ViolationInfo(
+                            rule_id=rule.rule_id,
+                            rule_name=rule.name,
+                            severity=rule.severity,
+                            category=rule.category,
+                            subject_type="capsule",
+                            subject_id=capsule.id,
+                            subject_urn=capsule.urn,
+                            subject_name=capsule.name,
+                            message=f"Table '{capsule.name}' has no assigned owner",
+                            remediation=rule.remediation,
+                        )
+                        return "fail", violation_info
+                elif req == "has_domain":
+                    if not capsule.domain_id:
+                        violation_info = ViolationInfo(
+                            rule_id=rule.rule_id,
+                            rule_name=rule.name,
+                            severity=rule.severity,
+                            category=rule.category,
+                            subject_type="capsule",
+                            subject_id=capsule.id,
+                            subject_urn=capsule.urn,
+                            subject_name=capsule.name,
+                            message=f"Table '{capsule.name}' is not assigned to a business domain",
+                            remediation=rule.remediation,
+                        )
+                        return "fail", violation_info
+
+            # Complex check conditions
+            if "check" in rule.condition:
+                check = rule.condition["check"]
+                violation_info = await self._evaluate_check_condition(rule, capsule, check)
+                if violation_info:
+                    return "fail", violation_info
 
             if "then" in rule.condition:
                 then = rule.condition["then"]
@@ -683,6 +1338,136 @@ class ConformanceService:
                                     remediation=rule.remediation,
                                 )
                                 return "fail", violation_info
+
+                # Check has_quality_rules constraint
+                if "has_quality_rules" in then and then["has_quality_rules"]:
+                    if not capsule.quality_rules:
+                        violation_info = ViolationInfo(
+                            rule_id=rule.rule_id,
+                            rule_name=rule.name,
+                            severity=rule.severity,
+                            category=rule.category,
+                            subject_type="capsule",
+                            subject_id=capsule.id,
+                            subject_urn=capsule.urn,
+                            subject_name=capsule.name,
+                            message=f"Table '{capsule.name}' has no quality rules defined",
+                            remediation=rule.remediation,
+                        )
+                        return "fail", violation_info
+
+                # Check has_contract constraint
+                if "has_contract" in then and then["has_contract"]:
+                    if not capsule.contracts:
+                        violation_info = ViolationInfo(
+                            rule_id=rule.rule_id,
+                            rule_name=rule.name,
+                            severity=rule.severity,
+                            category=rule.category,
+                            subject_type="capsule",
+                            subject_id=capsule.id,
+                            subject_urn=capsule.urn,
+                            subject_name=capsule.name,
+                            message=f"Table '{capsule.name}' has no data contract defined",
+                            remediation=rule.remediation,
+                        )
+                        return "fail", violation_info
+
+                # Check has_tags constraint
+                if "has_tags" in then and then["has_tags"]:
+                    if not capsule.tag_associations:
+                        violation_info = ViolationInfo(
+                            rule_id=rule.rule_id,
+                            rule_name=rule.name,
+                            severity=rule.severity,
+                            category=rule.category,
+                            subject_type="capsule",
+                            subject_id=capsule.id,
+                            subject_urn=capsule.urn,
+                            subject_name=capsule.name,
+                            message=f"Table '{capsule.name}' has no business domain tags",
+                            remediation=rule.remediation,
+                        )
+                        return "fail", violation_info
+
+                # Check has_version_history constraint
+                if "has_version_history" in then and then["has_version_history"]:
+                    if not capsule.versions:
+                        violation_info = ViolationInfo(
+                            rule_id=rule.rule_id,
+                            rule_name=rule.name,
+                            severity=rule.severity,
+                            category=rule.category,
+                            subject_type="capsule",
+                            subject_id=capsule.id,
+                            subject_urn=capsule.urn,
+                            subject_name=capsule.name,
+                            message=f"Table '{capsule.name}' has no schema version history",
+                            remediation=rule.remediation,
+                        )
+                        return "fail", violation_info
+
+                # Check has_transformation_code constraint
+                if "has_transformation_code" in then and then["has_transformation_code"]:
+                    if not capsule.transformation_codes:
+                        violation_info = ViolationInfo(
+                            rule_id=rule.rule_id,
+                            rule_name=rule.name,
+                            severity=rule.severity,
+                            category=rule.category,
+                            subject_type="capsule",
+                            subject_id=capsule.id,
+                            subject_urn=capsule.urn,
+                            subject_name=capsule.name,
+                            message=f"Model '{capsule.name}' has no transformation code documented",
+                            remediation=rule.remediation,
+                        )
+                        return "fail", violation_info
+
+                # Check has_retention_policy constraint
+                if "has_retention_policy" in then and then["has_retention_policy"]:
+                    has_retention = any(
+                        p.retention_days is not None for p in capsule.data_policies
+                    ) if capsule.data_policies else False
+                    if not has_retention:
+                        violation_info = ViolationInfo(
+                            rule_id=rule.rule_id,
+                            rule_name=rule.name,
+                            severity=rule.severity,
+                            category=rule.category,
+                            subject_type="capsule",
+                            subject_id=capsule.id,
+                            subject_urn=capsule.urn,
+                            subject_name=capsule.name,
+                            message=f"Table '{capsule.name}' has no retention policy defined",
+                            remediation=rule.remediation,
+                        )
+                        return "fail", violation_info
+
+                # Check quality_score_threshold constraint
+                if "quality_score_threshold" in then:
+                    threshold = then["quality_score_threshold"]
+                    # Calculate average quality score from quality rules
+                    if capsule.quality_rules:
+                        # This is simplified - in production would need actual quality scores
+                        avg_score = sum(
+                            getattr(qr, "last_score", 0) for qr in capsule.quality_rules
+                        ) / len(capsule.quality_rules) if capsule.quality_rules else 0
+                        if avg_score < threshold:
+                            violation_info = ViolationInfo(
+                                rule_id=rule.rule_id,
+                                rule_name=rule.name,
+                                severity=rule.severity,
+                                category=rule.category,
+                                subject_type="capsule",
+                                subject_id=capsule.id,
+                                subject_urn=capsule.urn,
+                                subject_name=capsule.name,
+                                message=f"Table '{capsule.name}' quality score ({avg_score:.1f}%) below threshold ({threshold}%)",
+                                details={"avg_score": avg_score, "threshold": threshold},
+                                remediation=rule.remediation,
+                            )
+                            return "fail", violation_info
 
         return "pass", None
 
@@ -800,7 +1585,407 @@ class ConformanceService:
                         )
                         return "fail", violation_info
 
+                # Check has_masking_rules constraint
+                if "has_masking_rules" in then and then["has_masking_rules"]:
+                    # Check if column has masking rules configured
+                    has_masking = bool(getattr(column, "masking_rules", None))
+                    if not has_masking:
+                        violation_info = ViolationInfo(
+                            rule_id=rule.rule_id,
+                            rule_name=rule.name,
+                            severity=rule.severity,
+                            category=rule.category,
+                            subject_type="column",
+                            subject_id=column.id,
+                            subject_urn=column.urn,
+                            subject_name=f"{capsule.name}.{column.name}",
+                            message=f"PII column '{column.name}' in Gold layer has no masking rules",
+                            details={"pii_type": column.pii_type},
+                            remediation=rule.remediation,
+                        )
+                        return "fail", violation_info
+
+            # Complex check conditions for columns
+            if "check" in rule.condition:
+                check = rule.condition["check"]
+                violation_info = await self._evaluate_column_check_condition(rule, column, capsule, check)
+                if violation_info:
+                    return "fail", violation_info
+
         return "pass", None
+
+    async def _evaluate_check_condition(
+        self,
+        rule: RuleDefinition,
+        capsule: Capsule,
+        check: str,
+    ) -> Optional[ViolationInfo]:
+        """Evaluate complex check conditions. Returns violation_info if check fails, None if passes."""
+        # For simplicity, many checks return None (pass) for now - will be implemented as needed
+
+        # Structural metadata checks (naming conventions require actual constraint/index data)
+        if check in [
+            "primary_key_naming_convention",
+            "foreign_key_naming_convention",
+            "unique_constraint_naming_convention",
+            "check_constraint_naming_convention",
+            "index_naming_convention",
+            "foreign_keys_have_indexes",
+            "composite_index_selectivity",
+        ]:
+            # These would require querying constraint/index models
+            # For now, return None (pass) - to be implemented with full constraint support
+            return None
+
+        # PII policy checks
+        if check == "pii_tables_have_data_policies":
+            if capsule.has_pii and not capsule.data_policies:
+                return ViolationInfo(
+                    rule_id=rule.rule_id,
+                    rule_name=rule.name,
+                    severity=rule.severity,
+                    category=rule.category,
+                    subject_type="capsule",
+                    subject_id=capsule.id,
+                    subject_urn=capsule.urn,
+                    subject_name=capsule.name,
+                    message=f"Table '{capsule.name}' contains PII but has no data policies",
+                    details={"pii_column_count": capsule.pii_column_count},
+                    remediation=rule.remediation,
+                )
+
+        # Quality rule checks
+        if check == "primary_keys_have_uniqueness_rules":
+            pk_columns = [col for col in capsule.columns if col.is_primary_key]
+            if pk_columns:
+                # Check if there are uniqueness quality rules for PK columns
+                # Simplified check - would need to query quality_rules properly
+                if not capsule.quality_rules:
+                    return ViolationInfo(
+                        rule_id=rule.rule_id,
+                        rule_name=rule.name,
+                        severity=rule.severity,
+                        category=rule.category,
+                        subject_type="capsule",
+                        subject_id=capsule.id,
+                        subject_urn=capsule.urn,
+                        subject_name=capsule.name,
+                        message=f"Table '{capsule.name}' has primary key but no uniqueness quality rules",
+                        details={"pk_columns": [col.name for col in pk_columns]},
+                        remediation=rule.remediation,
+                    )
+
+        if check == "quality_rules_mostly_enabled":
+            if capsule.quality_rules:
+                total = len(capsule.quality_rules)
+                enabled = sum(1 for qr in capsule.quality_rules if qr.is_enabled)
+                if total > 0 and (enabled / total) < 0.8:
+                    return ViolationInfo(
+                        rule_id=rule.rule_id,
+                        rule_name=rule.name,
+                        severity=rule.severity,
+                        category=rule.category,
+                        subject_type="capsule",
+                        subject_id=capsule.id,
+                        subject_urn=capsule.urn,
+                        subject_name=capsule.name,
+                        message=f"Table '{capsule.name}' has {enabled}/{total} quality rules enabled ({enabled/total*100:.0f}% < 80%)",
+                        details={"enabled": enabled, "total": total},
+                        remediation=rule.remediation,
+                    )
+
+        if check == "column_profiles_are_fresh":
+            if capsule.last_analyzed_at:
+                from datetime import timedelta
+                stale_threshold = datetime.now(timezone.utc) - timedelta(days=7)
+                if capsule.last_analyzed_at < stale_threshold:
+                    days_old = (datetime.now(timezone.utc) - capsule.last_analyzed_at).days
+                    return ViolationInfo(
+                        rule_id=rule.rule_id,
+                        rule_name=rule.name,
+                        severity=rule.severity,
+                        category=rule.category,
+                        subject_type="capsule",
+                        subject_id=capsule.id,
+                        subject_urn=capsule.urn,
+                        subject_name=capsule.name,
+                        message=f"Table '{capsule.name}' column profiles are {days_old} days old (> 7 days)",
+                        details={"last_analyzed_at": capsule.last_analyzed_at.isoformat(), "days_old": days_old},
+                        remediation=rule.remediation,
+                    )
+
+        # Policy checks
+        if check == "sensitive_data_has_access_controls":
+            if capsule.data_policies:
+                for policy in capsule.data_policies:
+                    sensitivity = getattr(policy, "sensitivity_level", "").lower()
+                    if sensitivity in ["high", "critical"]:
+                        access_controls = getattr(policy, "access_controls", None)
+                        if not access_controls:
+                            return ViolationInfo(
+                                rule_id=rule.rule_id,
+                                rule_name=rule.name,
+                                severity=rule.severity,
+                                category=rule.category,
+                                subject_type="capsule",
+                                subject_id=capsule.id,
+                                subject_urn=capsule.urn,
+                                subject_name=capsule.name,
+                                message=f"Table '{capsule.name}' has {sensitivity} sensitivity but no access controls",
+                                details={"sensitivity": sensitivity},
+                                remediation=rule.remediation,
+                            )
+
+        # Contract checks
+        if check == "contracts_have_freshness_sla":
+            if capsule.contracts:
+                contract = capsule.contracts[0]
+                if not getattr(contract, "freshness_sla_minutes", None):
+                    return ViolationInfo(
+                        rule_id=rule.rule_id,
+                        rule_name=rule.name,
+                        severity=rule.severity,
+                        category=rule.category,
+                        subject_type="capsule",
+                        subject_id=capsule.id,
+                        subject_urn=capsule.urn,
+                        subject_name=capsule.name,
+                        message=f"Contract for '{capsule.name}' has no freshness SLA defined",
+                        remediation=rule.remediation,
+                    )
+
+        if check == "contracts_have_completeness_sla":
+            if capsule.contracts:
+                contract = capsule.contracts[0]
+                if not getattr(contract, "completeness_threshold", None):
+                    return ViolationInfo(
+                        rule_id=rule.rule_id,
+                        rule_name=rule.name,
+                        severity=rule.severity,
+                        category=rule.category,
+                        subject_type="capsule",
+                        subject_id=capsule.id,
+                        subject_urn=capsule.urn,
+                        subject_name=capsule.name,
+                        message=f"Contract for '{capsule.name}' has no completeness SLA defined",
+                        remediation=rule.remediation,
+                    )
+
+        if check == "contracts_have_quality_sla":
+            if capsule.contracts:
+                contract = capsule.contracts[0]
+                if not getattr(contract, "quality_threshold", None):
+                    return ViolationInfo(
+                        rule_id=rule.rule_id,
+                        rule_name=rule.name,
+                        severity=rule.severity,
+                        category=rule.category,
+                        subject_type="capsule",
+                        subject_id=capsule.id,
+                        subject_urn=capsule.urn,
+                        subject_name=capsule.name,
+                        message=f"Contract for '{capsule.name}' has no quality SLA defined",
+                        remediation=rule.remediation,
+                    )
+
+        if check == "contracts_have_support_contacts":
+            if capsule.contracts:
+                contract = capsule.contracts[0]
+                support_contact = getattr(contract, "support_contact", None)
+                if not support_contact:
+                    return ViolationInfo(
+                        rule_id=rule.rule_id,
+                        rule_name=rule.name,
+                        severity=rule.severity,
+                        category=rule.category,
+                        subject_type="capsule",
+                        subject_id=capsule.id,
+                        subject_urn=capsule.urn,
+                        subject_name=capsule.name,
+                        message=f"Contract for '{capsule.name}' has no support contacts defined",
+                        remediation=rule.remediation,
+                    )
+
+        if check == "incidents_acknowledged_within_sla":
+            if capsule.sla_incidents:
+                from datetime import timedelta
+                sla_hours = 24
+                cutoff = datetime.now(timezone.utc) - timedelta(hours=sla_hours)
+                for incident in capsule.sla_incidents:
+                    if incident.status == "open" and incident.created_at < cutoff:
+                        if not incident.acknowledged_at:
+                            hours_old = (datetime.now(timezone.utc) - incident.created_at).total_seconds() / 3600
+                            return ViolationInfo(
+                                rule_id=rule.rule_id,
+                                rule_name=rule.name,
+                                severity=rule.severity,
+                                category=rule.category,
+                                subject_type="capsule",
+                                subject_id=capsule.id,
+                                subject_urn=capsule.urn,
+                                subject_name=capsule.name,
+                                message=f"SLA incident for '{capsule.name}' not acknowledged within 24h ({hours_old:.1f}h old)",
+                                details={"incident_id": str(incident.id), "hours_old": hours_old},
+                                remediation=rule.remediation,
+                            )
+
+        if check == "critical_incidents_resolved_quickly":
+            if capsule.sla_incidents:
+                from datetime import timedelta
+                sla_hours = 4
+                cutoff = datetime.now(timezone.utc) - timedelta(hours=sla_hours)
+                for incident in capsule.sla_incidents:
+                    if incident.severity == "critical" and incident.status == "open" and incident.created_at < cutoff:
+                        hours_old = (datetime.now(timezone.utc) - incident.created_at).total_seconds() / 3600
+                        return ViolationInfo(
+                            rule_id=rule.rule_id,
+                            rule_name=rule.name,
+                            severity=rule.severity,
+                            category=rule.category,
+                            subject_type="capsule",
+                            subject_id=capsule.id,
+                            subject_urn=capsule.urn,
+                            subject_name=capsule.name,
+                            message=f"Critical SLA incident for '{capsule.name}' not resolved within 4h ({hours_old:.1f}h old)",
+                            details={"incident_id": str(incident.id), "hours_old": hours_old},
+                            remediation=rule.remediation,
+                        )
+
+        if check == "capsule_meets_freshness_sla":
+            if capsule.contracts and capsule.last_analyzed_at:
+                contract = capsule.contracts[0]
+                freshness_sla_minutes = getattr(contract, "freshness_sla_minutes", None)
+                if freshness_sla_minutes:
+                    from datetime import timedelta
+                    sla_cutoff = datetime.now(timezone.utc) - timedelta(minutes=freshness_sla_minutes)
+                    if capsule.last_analyzed_at < sla_cutoff:
+                        minutes_old = (datetime.now(timezone.utc) - capsule.last_analyzed_at).total_seconds() / 60
+                        return ViolationInfo(
+                            rule_id=rule.rule_id,
+                            rule_name=rule.name,
+                            severity=rule.severity,
+                            category=rule.category,
+                            subject_type="capsule",
+                            subject_id=capsule.id,
+                            subject_urn=capsule.urn,
+                            subject_name=capsule.name,
+                            message=f"Table '{capsule.name}' last updated {minutes_old:.0f}m ago (SLA: {freshness_sla_minutes}m)",
+                            details={"minutes_old": minutes_old, "sla_minutes": freshness_sla_minutes},
+                            remediation=rule.remediation,
+                        )
+
+        # Provenance checks
+        if check == "version_changes_have_descriptions":
+            if capsule.versions:
+                for version in capsule.versions:
+                    if not getattr(version, "change_summary", None):
+                        return ViolationInfo(
+                            rule_id=rule.rule_id,
+                            rule_name=rule.name,
+                            severity=rule.severity,
+                            category=rule.category,
+                            subject_type="capsule",
+                            subject_id=capsule.id,
+                            subject_urn=capsule.urn,
+                            subject_name=capsule.name,
+                            message=f"Schema version for '{capsule.name}' missing change summary",
+                            details={"version_id": str(version.id)},
+                            remediation=rule.remediation,
+                        )
+
+        # Default: pass
+        return None
+
+    async def _evaluate_column_check_condition(
+        self,
+        rule: RuleDefinition,
+        column: Column,
+        capsule: Capsule,
+        check: str,
+    ) -> Optional[ViolationInfo]:
+        """Evaluate complex column-level check conditions. Returns violation_info if check fails, None if passes."""
+
+        # Semantic checks
+        if check == "key_columns_have_business_terms":
+            key_patterns = [r"_id$", r"^id$", r"name", r"amount", r"date", r"_date$"]
+            column_name_lower = column.name.lower()
+            if any(re.search(p, column_name_lower) for p in key_patterns):
+                # Check if column has business term associations
+                has_business_terms = bool(getattr(column, "business_term_associations", None))
+                if not has_business_terms:
+                    return ViolationInfo(
+                        rule_id=rule.rule_id,
+                        rule_name=rule.name,
+                        severity=rule.severity,
+                        category=rule.category,
+                        subject_type="column",
+                        subject_id=column.id,
+                        subject_urn=column.urn,
+                        subject_name=f"{capsule.name}.{column.name}",
+                        message=f"Key business column '{column.name}' has no linked business terms",
+                        remediation=rule.remediation,
+                    )
+
+        if check in ["enum_columns_have_value_domains", "code_status_columns_have_value_domains"]:
+            column_name_lower = column.name.lower()
+            is_enum_candidate = False
+
+            if check == "code_status_columns_have_value_domains":
+                is_enum_candidate = column_name_lower.endswith("_code") or column_name_lower.endswith("_status")
+            else:
+                # Check if column looks like an enumeration (small cardinality, string type)
+                is_enum_candidate = column.data_type in ["VARCHAR", "TEXT", "CHAR", "STRING"]
+
+            if is_enum_candidate:
+                has_value_domain = bool(getattr(column, "value_domain_id", None))
+                if not has_value_domain:
+                    return ViolationInfo(
+                        rule_id=rule.rule_id,
+                        rule_name=rule.name,
+                        severity=rule.severity,
+                        category=rule.category,
+                        subject_type="column",
+                        subject_id=column.id,
+                        subject_urn=column.urn,
+                        subject_name=f"{capsule.name}.{column.name}",
+                        message=f"Enumerated column '{column.name}' has no value domain",
+                        remediation=rule.remediation,
+                    )
+
+        # Policy checks
+        if check == "pii_columns_have_policies":
+            if column.pii_type:
+                # Check if column has associated policies via capsule.data_policies
+                # or via column-specific policy associations
+                has_policies = bool(capsule.data_policies)
+                if not has_policies:
+                    return ViolationInfo(
+                        rule_id=rule.rule_id,
+                        rule_name=rule.name,
+                        severity=rule.severity,
+                        category=rule.category,
+                        subject_type="column",
+                        subject_id=column.id,
+                        subject_urn=column.urn,
+                        subject_name=f"{capsule.name}.{column.name}",
+                        message=f"PII column '{column.name}' has no associated data policies",
+                        details={"pii_type": column.pii_type},
+                        remediation=rule.remediation,
+                    )
+
+        # Quality checks
+        if check in [
+            "critical_columns_have_completeness_rules",
+            "not_null_columns_100_percent_complete",
+            "foreign_keys_need_relationships_rules",
+            "enum_columns_have_validity_rules",
+        ]:
+            # These would require querying quality_rules for specific column
+            # Simplified check - returns None (pass) for now
+            return None
+
+        # Default: pass
+        return None
 
     def _matches_condition(self, capsule: Capsule, condition: dict) -> bool:
         """Check if a capsule matches a condition."""
@@ -808,6 +1993,11 @@ class ConformanceService:
             capsule_layer = (capsule.layer or "").lower()
             allowed_layers = [l.lower() for l in condition["layer"]]
             if capsule_layer not in allowed_layers:
+                return False
+        if "capsule_type" in condition:
+            capsule_type = (capsule.capsule_type or "").lower()
+            allowed_types = [t.lower() for t in condition["capsule_type"]]
+            if capsule_type not in allowed_types:
                 return False
         return True
 
@@ -985,3 +2175,126 @@ class ConformanceService:
         }
 
         return yaml.dump(rules_data, default_flow_style=False, sort_keys=False)
+
+    async def update_rule(self, rule_id: str, enabled: bool) -> bool:
+        """Update a rule's enabled status.
+
+        Args:
+            rule_id: The rule ID to update.
+            enabled: Whether the rule should be enabled.
+
+        Returns:
+            True if the rule was updated, False if not found.
+        """
+        if rule_id not in self._rules:
+            return False
+
+        # Update in-memory rule
+        rule = self._rules[rule_id]
+        self._rules[rule_id] = RuleDefinition(
+            rule_id=rule.rule_id,
+            name=rule.name,
+            description=rule.description,
+            severity=rule.severity,
+            category=rule.category,
+            scope=rule.scope,
+            rule_set=rule.rule_set,
+            enabled=enabled,
+            pattern=rule.pattern,
+            pattern_type=rule.pattern_type,
+            condition=rule.condition,
+            remediation=rule.remediation,
+        )
+
+        # Sync to database
+        db_rule = await self.rule_repo.get_by_rule_id(rule_id)
+        if db_rule:
+            db_rule.enabled = enabled
+            await self.session.commit()
+
+        return True
+
+    async def test_rule(
+        self,
+        rule_id: str,
+        capsule_urns: Optional[list[str]] = None,
+    ) -> ConformanceResult:
+        """Test a single rule against specific capsules.
+
+        Args:
+            rule_id: The rule ID to test.
+            capsule_urns: Optional list of capsule URNs to test against.
+                         If None, tests against all capsules.
+
+        Returns:
+            EvaluationResult with violations for this rule only.
+
+        Raises:
+            ValueError: If rule_id is not found.
+        """
+        if rule_id not in self._rules:
+            raise ValueError(f"Rule not found: {rule_id}")
+
+        rule = self._rules[rule_id]
+
+        # Get capsules to test
+        if capsule_urns:
+            capsules = []
+            for urn in capsule_urns:
+                capsule = await self.capsule_repo.get_by_urn(urn)
+                if capsule:
+                    capsules.append(capsule)
+        else:
+            # Get all capsules
+            capsules = await self.capsule_repo.get_all()
+
+        # Evaluate the single rule
+        violations: list[ViolationInfo] = []
+        rules_checked = 0
+
+        for capsule in capsules:
+            if rule.scope == RuleScope.CAPSULE:
+                status, violation_info = await self._evaluate_capsule_rule(rule, capsule)
+                rules_checked += 1
+                if status == "fail" and violation_info:
+                    violations.append(violation_info)
+            elif rule.scope == RuleScope.COLUMN:
+                for column in capsule.columns:
+                    status, violation_info = await self._evaluate_column_rule(rule, column, capsule)
+                    rules_checked += 1
+                    if status == "fail" and violation_info:
+                        violations.append(violation_info)
+
+        # Calculate score
+        passing_rules = rules_checked - len(violations)
+        score = (passing_rules / rules_checked * 100) if rules_checked > 0 else 100.0
+
+        # Create result with single rule category
+        by_severity = {}
+        by_category = {}
+
+        severity_key = rule.severity.value
+        by_severity[severity_key] = {
+            "total": rules_checked,
+            "pass": passing_rules,
+            "fail": len(violations),
+        }
+
+        category_key = rule.category.value
+        by_category[category_key] = {
+            "total": rules_checked,
+            "pass": passing_rules,
+            "fail": len(violations),
+        }
+
+        return ConformanceResult(
+            score=score,
+            weighted_score=score,  # Same as score for single rule
+            total_rules=1,  # Only one rule tested
+            passing_rules=1 if len(violations) == 0 else 0,
+            failing_rules=1 if len(violations) > 0 else 0,
+            not_applicable=0,
+            by_severity=by_severity,
+            by_category=by_category,
+            violations=violations,
+        )

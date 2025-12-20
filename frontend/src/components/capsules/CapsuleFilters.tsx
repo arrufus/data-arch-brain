@@ -78,7 +78,7 @@ export default function CapsuleFilters({ filters, onFiltersChange }: CapsuleFilt
           placeholder="Search capsules by name, description, or URN..."
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
       </div>
 
@@ -93,7 +93,7 @@ export default function CapsuleFilters({ filters, onFiltersChange }: CapsuleFilt
             id="layer-filter"
             value={filters.layer || ''}
             onChange={(e) => handleLayerChange(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">All Layers</option>
             <option value="raw">Raw</option>
@@ -113,7 +113,7 @@ export default function CapsuleFilters({ filters, onFiltersChange }: CapsuleFilt
             id="type-filter"
             value={filters.capsule_type || ''}
             onChange={(e) => handleTypeChange(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">All Types</option>
             <option value="model">Model</option>
@@ -135,7 +135,7 @@ export default function CapsuleFilters({ filters, onFiltersChange }: CapsuleFilt
               filters.has_pii === true ? 'true' : filters.has_pii === false ? 'false' : ''
             }
             onChange={(e) => handlePIIChange(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">All</option>
             <option value="true">Has PII</option>

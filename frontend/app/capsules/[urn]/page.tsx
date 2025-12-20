@@ -14,10 +14,13 @@ import Loading from '@/components/common/Loading';
 import ErrorMessage from '@/components/common/ErrorMessage';
 import Badge from '@/components/common/Badge';
 import ColumnsTab from '@/components/capsules/ColumnsTab';
+import QualityTab from '@/components/capsules/QualityTab';
+import PoliciesTab from '@/components/capsules/PoliciesTab';
 import LineageTab from '@/components/capsules/LineageTab';
+import ContractsTab from '@/components/capsules/ContractsTab';
 import ViolationsTab from '@/components/capsules/ViolationsTab';
 
-type TabType = 'columns' | 'lineage' | 'violations';
+type TabType = 'columns' | 'quality' | 'policies' | 'lineage' | 'contracts' | 'violations';
 
 // Icon mapping for capsule types
 const typeIcons = {
@@ -152,7 +155,7 @@ export default function CapsuleDetailPage() {
       {/* Tabs */}
       <div className="bg-white rounded-lg shadow">
         {/* Tab Navigation */}
-        <div className="border-b border-gray-200">
+        <div className="border-b border-gray-200 overflow-x-auto">
           <nav className="flex gap-8 px-6" aria-label="Tabs">
             <TabButton
               active={activeTab === 'columns'}
@@ -162,11 +165,29 @@ export default function CapsuleDetailPage() {
               Columns
             </TabButton>
             <TabButton
+              active={activeTab === 'quality'}
+              onClick={() => setActiveTab('quality')}
+            >
+              Quality
+            </TabButton>
+            <TabButton
+              active={activeTab === 'policies'}
+              onClick={() => setActiveTab('policies')}
+            >
+              Policies
+            </TabButton>
+            <TabButton
               active={activeTab === 'lineage'}
               onClick={() => setActiveTab('lineage')}
               badge={capsule.upstream_count + capsule.downstream_count}
             >
-              Lineage
+              Lineage & Versions
+            </TabButton>
+            <TabButton
+              active={activeTab === 'contracts'}
+              onClick={() => setActiveTab('contracts')}
+            >
+              Contracts
             </TabButton>
             <TabButton
               active={activeTab === 'violations'}
@@ -180,7 +201,10 @@ export default function CapsuleDetailPage() {
         {/* Tab Content */}
         <div className="p-6">
           {activeTab === 'columns' && <ColumnsTab capsuleUrn={urn} />}
+          {activeTab === 'quality' && <QualityTab capsuleUrn={urn} />}
+          {activeTab === 'policies' && <PoliciesTab capsuleUrn={urn} />}
           {activeTab === 'lineage' && <LineageTab capsuleUrn={urn} />}
+          {activeTab === 'contracts' && <ContractsTab capsuleUrn={urn} />}
           {activeTab === 'violations' && <ViolationsTab capsuleUrn={urn} />}
         </div>
       </div>

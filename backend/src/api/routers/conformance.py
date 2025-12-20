@@ -451,3 +451,116 @@ async def delete_rule(
         raise NotFoundError("Rule", rule_id)
 
     return {"message": f"Rule {rule_id} deleted", "rule_id": rule_id}
+
+
+class UpdateRuleRequest(BaseModel):
+    """Request body for updating a rule."""
+
+    enabled: bool
+
+
+@router.patch("/rules/{rule_id}")
+async def update_rule(
+    rule_id: str,
+    body: UpdateRuleRequest,
+    session: AsyncSession = Depends(get_session),
+) -> RuleResponse:
+    """Update a conformance rule.
+
+    Currently supports updating the enabled status of a rule.
+    """
+    service = ConformanceService(session)
+
+    updated = await service.update_rule(rule_id, body.enabled)
+    if not updated:
+        raise NotFoundError("Rule", rule_id)
+
+    # Return updated rule
+    rules = service.get_available_rules(enabled_only=False)
+    rule = next((r for r in rules if r.rule_id == rule_id), None)
+
+    if not rule:
+        raise NotFoundError("Rule", rule_id)
+
+    return RuleResponse(
+        rule_id=rule.rule_id,
+        name=rule.name,
+        description=rule.description,
+        severity=rule.severity.value,
+        category=rule.category.value,
+        rule_set=rule.rule_set,
+        scope=rule.scope.value,
+        enabled=rule.enabled,
+        pattern=rule.pattern,
+        remediation=rule.remediation,
+    )
+
+
+class TestRuleRequest(BaseModel):
+    """Request body for testing a rule."""
+
+    capsule_urns: Optional[list[str]] = None
+
+
+@router.post("/rules/{rule_id}/test", response_model=EvaluateResponse)
+@limiter.limit("5/minute")
+async def test_rule(
+    request: Request,
+    response: Response,
+    rule_id: str,
+    body: TestRuleRequest,
+    session: AsyncSession = Depends(get_session),
+) -> EvaluateResponse:
+    """Test a single conformance rule against specific capsules.
+
+    This endpoint allows you to test a single rule without running a full
+    conformance evaluation. Useful for testing custom rules or debugging.
+    """
+    service = ConformanceService(session)
+
+    try:
+        result = await service.test_rule(rule_id, body.capsule_urns)
+    except ValueError as e:
+        raise NotFoundError("Rule", rule_id)
+
+    by_severity = {
+        sev: ConformanceBySeverity(
+            total=data["total"],
+            passing=data["pass"],
+            failing=data["fail"],
+        )
+        for sev, data in result.by_severity.items()
+    }
+
+    violations = [
+        ViolationResponse(
+            rule_id=v.rule_id,
+            rule_name=v.rule_name,
+            severity=v.severity.value,
+            category=v.category.value,
+            subject_type=v.subject_type,
+            subject_id=str(v.subject_id),
+            subject_urn=v.subject_urn,
+            subject_name=v.subject_name,
+            message=v.message,
+            details=v.details,
+            remediation=v.remediation,
+        )
+        for v in result.violations
+    ]
+
+    return EvaluateResponse(
+        score=result.score,
+        weighted_score=result.weighted_score,
+        summary=ConformanceScoreSummary(
+            total_rules=result.total_rules,
+            passing_rules=result.passing_rules,
+            failing_rules=result.failing_rules,
+            not_applicable=result.not_applicable,
+        ),
+        by_severity=by_severity,
+        by_category=result.by_category,
+        violation_count=len(violations),
+        violations=violations,
+        computed_at=datetime.now(timezone.utc).isoformat(),
+    )

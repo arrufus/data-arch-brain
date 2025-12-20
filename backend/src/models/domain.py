@@ -9,8 +9,12 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.models.base import DCSBase, JSONType, fk_ref
 
 if TYPE_CHECKING:
+    from src.models.business_term import BusinessTerm
     from src.models.capsule import Capsule
+    from src.models.capsule_contract import CapsuleContract
+    from src.models.data_policy import DataPolicy
     from src.models.data_product import DataProduct
+    from src.models.value_domain import ValueDomain
 
 
 class Owner(DCSBase):
@@ -30,6 +34,10 @@ class Owner(DCSBase):
     capsules: Mapped[list["Capsule"]] = relationship(back_populates="owner")
     domains: Mapped[list["Domain"]] = relationship(back_populates="owner")
     data_products: Mapped[list["DataProduct"]] = relationship(back_populates="owner")
+    business_terms: Mapped[list["BusinessTerm"]] = relationship(back_populates="owner")
+    value_domains: Mapped[list["ValueDomain"]] = relationship(back_populates="owner")
+    data_policies: Mapped[list["DataPolicy"]] = relationship(back_populates="policy_owner")
+    capsule_contracts: Mapped[list["CapsuleContract"]] = relationship(back_populates="contract_owner")
 
 
 class Domain(DCSBase):
@@ -55,3 +63,4 @@ class Domain(DCSBase):
     owner: Mapped[Optional["Owner"]] = relationship(back_populates="domains")
     capsules: Mapped[list["Capsule"]] = relationship(back_populates="domain")
     data_products: Mapped[list["DataProduct"]] = relationship(back_populates="domain")
+    business_terms: Mapped[list["BusinessTerm"]] = relationship(back_populates="domain")

@@ -92,7 +92,7 @@ export default function PIIInventoryTab() {
             <select
               value={layerFilter}
               onChange={(e) => setLayerFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="px-3 py-2 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="all">All Layers</option>
               <option value="raw">Raw</option>
@@ -106,7 +106,7 @@ export default function PIIInventoryTab() {
           <select
             value={piiTypeFilter}
             onChange={(e) => setPiiTypeFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="px-3 py-2 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="all">All PII Types</option>
             {data.summary.pii_types_found.map((type) => (
