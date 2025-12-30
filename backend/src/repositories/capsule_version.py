@@ -115,6 +115,33 @@ class CapsuleVersionRepository(BaseRepository[CapsuleVersion]):
         result = await self.session.execute(stmt)
         return result.scalar() or 0
 
+    async def get_current_by_capsule(
+        self,
+        capsule_id: UUID,
+        offset: int = 0,
+        limit: int = 100,
+    ) -> Sequence[CapsuleVersion]:
+        """Get current versions for a capsule (filtered by is_current flag)."""
+        stmt = (
+            select(CapsuleVersion)
+            .where(CapsuleVersion.capsule_id == capsule_id)
+            .where(CapsuleVersion.is_current == True)  # noqa: E712
+            .order_by(CapsuleVersion.version_number.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def count_current_by_capsule(self, capsule_id: UUID) -> int:
+        """Count current versions for a capsule."""
+        stmt = select(func.count()).select_from(CapsuleVersion).where(
+            CapsuleVersion.capsule_id == capsule_id,
+            CapsuleVersion.is_current == True  # noqa: E712
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar() or 0
+
     async def get_latest_version_number(self, capsule_id: UUID) -> int:
         """Get the latest version number for a capsule."""
         stmt = (

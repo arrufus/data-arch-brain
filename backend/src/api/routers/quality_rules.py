@@ -98,6 +98,7 @@ async def create_quality_rule(
 async def list_quality_rules(
     db: DbSession,
     capsule_id: Optional[str] = Query(None, description="Filter by capsule ID"),
+    capsule_urn: Optional[str] = Query(None, description="Filter by capsule URN"),
     column_id: Optional[str] = Query(None, description="Filter by column ID"),
     rule_type: Optional[str] = Query(None, description="Filter by rule type"),
     rule_category: Optional[str] = Query(None, description="Filter by rule category"),
@@ -108,21 +109,29 @@ async def list_quality_rules(
     """List quality rules with optional filters."""
     repo = QualityRuleRepository(db)
 
-    if capsule_id:
-        rules = await repo.get_by_capsule(UUID(capsule_id), offset, limit)
-        total = await repo.count_by_capsule(UUID(capsule_id))
+    # Resolve URN to ID if needed
+    resolved_capsule_id = capsule_id
+    if capsule_urn and not capsule_id:
+        capsule_repo = CapsuleRepository(db)
+        capsule = await capsule_repo.get_by_urn(capsule_urn)
+        if capsule:
+            resolved_capsule_id = str(capsule.id)
+
+    if resolved_capsule_id:
+        rules = await repo.get_by_capsule(UUID(resolved_capsule_id), offset, limit)
+        total = await repo.count_by_capsule(UUID(resolved_capsule_id))
     elif column_id:
         rules = await repo.get_by_column(UUID(column_id), offset, limit)
         total = await repo.count_by_column(UUID(column_id))
     elif rule_type:
         rules = await repo.get_by_type(rule_type, offset, limit)
-        total = await repo.count()
+        total = await repo.count_by_type(rule_type)
     elif rule_category:
         rules = await repo.get_by_category(rule_category, offset, limit)
-        total = await repo.count()
+        total = await repo.count_by_category(rule_category)
     elif enabled_only:
         rules = await repo.get_enabled_rules(offset=offset, limit=limit)
-        total = await repo.count()
+        total = await repo.count_enabled_rules()
     else:
         rules = await repo.get_all(offset, limit)
         total = await repo.count()

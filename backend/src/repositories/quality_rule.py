@@ -130,3 +130,30 @@ class QualityRuleRepository(BaseRepository[QualityRule]):
         )
         result = await self.session.execute(stmt)
         return result.scalar() or 0
+
+    async def count_by_type(self, rule_type: str) -> int:
+        """Count quality rules by type."""
+        from sqlalchemy import func
+        stmt = select(func.count()).select_from(QualityRule).where(
+            QualityRule.rule_type == rule_type
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar() or 0
+
+    async def count_by_category(self, category: str) -> int:
+        """Count quality rules by category."""
+        from sqlalchemy import func
+        stmt = select(func.count()).select_from(QualityRule).where(
+            QualityRule.rule_category == category
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar() or 0
+
+    async def count_enabled_rules(self) -> int:
+        """Count enabled quality rules."""
+        from sqlalchemy import func
+        stmt = select(func.count()).select_from(QualityRule).where(
+            QualityRule.is_enabled == True  # noqa: E712
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar() or 0

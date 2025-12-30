@@ -9,6 +9,7 @@ from src.models.base import DCSBase, JSONType
 
 if TYPE_CHECKING:
     from src.models.capsule import Capsule
+    from src.models.pipeline import Pipeline
 
 
 class SourceSystem(DCSBase):
@@ -24,3 +25,4 @@ class SourceSystem(DCSBase):
 
     # Relationships
     capsules: Mapped[list["Capsule"]] = relationship(back_populates="source_system")
+    pipelines: Mapped[list["Pipeline"]] = relationship(back_populates="source_system")

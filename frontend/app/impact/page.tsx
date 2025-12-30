@@ -5,40 +5,59 @@
  *
  * Analyze downstream impact of changes to data capsules.
  * Shows "what-if" analysis and affected capsule highlighting.
+ * Now includes task-level impact analysis for Airflow pipelines.
  */
 
 import { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
-import { AlertCircle, Search, ChevronDown, X, Target, TrendingDown, Layers } from 'lucide-react';
+import { AlertCircle, Search, ChevronDown, X, Target, TrendingDown, Layers, GitBranch, Workflow } from 'lucide-react';
 import Loading from '@/components/common/Loading';
 import ErrorMessage from '@/components/common/ErrorMessage';
 import Badge from '@/components/common/Badge';
 import Link from 'next/link';
+import TaskImpactAnalysis from '@/components/impact/TaskImpactAnalysis';
+
+type ViewMode = 'capsule' | 'task';
+type ChangeType = 'delete' | 'rename' | 'type_change' | 'nullability' | 'default';
 
 export default function ImpactAnalysisPage() {
+  // View mode toggle
+  const [viewMode, setViewMode] = useState<ViewMode>('capsule');
+
+  // Capsule impact state
   const [selectedCapsuleUrn, setSelectedCapsuleUrn] = useState<string | null>(null);
   const [capsuleSearch, setCapsuleSearch] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [maxDepth, setMaxDepth] = useState(5);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Handle click outside to close dropdown
+  // Task impact state
+  const [selectedColumnUrn, setSelectedColumnUrn] = useState<string | null>(null);
+  const [columnSearch, setColumnSearch] = useState('');
+  const [isColumnDropdownOpen, setIsColumnDropdownOpen] = useState(false);
+  const [changeType, setChangeType] = useState<ChangeType>('rename');
+  const columnDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Handle click outside to close dropdowns
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
       }
+      if (columnDropdownRef.current && !columnDropdownRef.current.contains(event.target as Node)) {
+        setIsColumnDropdownOpen(false);
+      }
     };
 
-    if (isDropdownOpen) {
+    if (isDropdownOpen || isColumnDropdownOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isDropdownOpen]);
+  }, [isDropdownOpen, isColumnDropdownOpen]);
 
   // Fetch capsules for type-ahead dropdown
   const { data: capsulesData, isLoading: isLoadingCapsules } = useQuery({
@@ -53,6 +72,53 @@ export default function ImpactAnalysisPage() {
       return response.data;
     },
     enabled: isDropdownOpen,
+  });
+
+  // Fetch columns for task impact column selection
+  const { data: columnsData, isLoading: isLoadingColumns } = useQuery({
+    queryKey: ['columns-search', columnSearch],
+    queryFn: async () => {
+      // Get all capsules first, then fetch columns for each
+      const capsulesResponse = await apiClient.get('/api/v1/capsules', {
+        params: {
+          search: columnSearch || undefined,
+          limit: 20,
+        },
+      });
+
+      // Flatten columns from all capsules
+      const allColumns: any[] = [];
+      for (const capsule of capsulesResponse.data.data || []) {
+        if (capsule.urn) {
+          try {
+            const columnsResponse = await apiClient.get(
+              `/api/v1/capsules/${encodeURIComponent(capsule.urn)}/columns`
+            );
+            // Fix: Access nested data property - API returns { data: [...], pagination: {...} }
+            const columns = columnsResponse.data.data || [];
+            allColumns.push(...columns.map((col: any) => ({
+              ...col,
+              capsule_name: capsule.name,
+              capsule_urn: capsule.urn,
+            })));
+          } catch (err) {
+            // Skip capsules without columns
+            console.warn(`Failed to fetch columns for ${capsule.name}:`, err);
+          }
+        }
+      }
+
+      // Filter columns based on search
+      const filteredColumns = allColumns.filter((col: any) =>
+        !columnSearch ||
+        col.name?.toLowerCase().includes(columnSearch.toLowerCase()) ||
+        col.capsule_name?.toLowerCase().includes(columnSearch.toLowerCase())
+      );
+
+      console.log(`Found ${allColumns.length} total columns, ${filteredColumns.length} after filtering`);
+      return filteredColumns;
+    },
+    enabled: isColumnDropdownOpen,
   });
 
   // Fetch lineage (downstream only) for impact analysis
@@ -125,15 +191,51 @@ export default function ImpactAnalysisPage() {
           Impact Analysis
         </h1>
         <p className="mt-2 text-gray-600">
-          Analyze downstream impact of changes to data capsules
+          Analyze downstream impact of changes to data capsules and Airflow tasks
         </p>
       </div>
 
-      {/* Capsule Selection */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
-          Select Source Capsule
-        </h2>
+      {/* View Mode Toggle */}
+      <div className="bg-white rounded-lg shadow p-4">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setViewMode('capsule')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+              viewMode === 'capsule'
+                ? 'bg-purple-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            <GitBranch className="w-4 h-4" />
+            Capsule Impact
+          </button>
+          <button
+            onClick={() => setViewMode('task')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+              viewMode === 'task'
+                ? 'bg-purple-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            <Workflow className="w-4 h-4" />
+            Task Impact (Airflow)
+          </button>
+        </div>
+        <p className="text-sm text-gray-600 mt-2">
+          {viewMode === 'capsule'
+            ? 'Analyze which capsules are affected by changes to other capsules'
+            : 'Analyze which Airflow tasks are affected by schema changes to columns'}
+        </p>
+      </div>
+
+      {/* Capsule Impact View */}
+      {viewMode === 'capsule' && (
+        <>
+          {/* Capsule Selection */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              Select Source Capsule
+            </h2>
 
         {selectedCapsuleUrn ? (
           <div className="space-y-4">
@@ -442,22 +544,175 @@ export default function ImpactAnalysisPage() {
         </>
       )}
 
-      {/* Help Section */}
-      {!selectedCapsuleUrn && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-          <h3 className="font-semibold text-blue-900 mb-2">How to Use Impact Analysis</h3>
-          <ol className="text-sm text-blue-800 space-y-2 list-decimal list-inside">
-            <li>Select a source capsule using the search dropdown above</li>
-            <li>Choose the analysis depth (how many levels downstream to analyze)</li>
-            <li>Review the impact statistics and affected capsules</li>
-            <li>Click on any affected capsule to view its details</li>
-            <li>Use the "View in Lineage Graph" link to see the visual representation</li>
-          </ol>
-          <p className="text-sm text-blue-800 mt-3">
-            <strong>Use Case:</strong> Before making breaking changes to a capsule, use this tool to understand
-            the blast radius and coordinate with affected downstream teams.
-          </p>
-        </div>
+          {/* Help Section */}
+          {!selectedCapsuleUrn && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+              <h3 className="font-semibold text-blue-900 mb-2">How to Use Capsule Impact Analysis</h3>
+              <ol className="text-sm text-blue-800 space-y-2 list-decimal list-inside">
+                <li>Select a source capsule using the search dropdown above</li>
+                <li>Choose the analysis depth (how many levels downstream to analyze)</li>
+                <li>Review the impact statistics and affected capsules</li>
+                <li>Click on any affected capsule to view its details</li>
+                <li>Use the "View in Lineage Graph" link to see the visual representation</li>
+              </ol>
+              <p className="text-sm text-blue-800 mt-3">
+                <strong>Use Case:</strong> Before making breaking changes to a capsule, use this tool to understand
+                the blast radius and coordinate with affected downstream teams.
+              </p>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Task Impact View */}
+      {viewMode === 'task' && (
+        <>
+          {/* Column Selection */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              Select Column and Change Type
+            </h2>
+
+            {selectedColumnUrn ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex-1">
+                    <p className="font-medium text-blue-900">
+                      {selectedColumnUrn.split(':').pop()}
+                    </p>
+                    <p className="text-sm text-blue-700 font-mono">{selectedColumnUrn}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedColumnUrn(null);
+                      setColumnSearch('');
+                    }}
+                    className="text-blue-600 hover:text-blue-800"
+                    title="Clear selection"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Change Type
+                  </label>
+                  <select
+                    value={changeType}
+                    onChange={(e) => setChangeType(e.target.value as ChangeType)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    <option value="delete">Delete Column (Highest Risk)</option>
+                    <option value="rename">Rename Column</option>
+                    <option value="type_change">Change Data Type</option>
+                    <option value="nullability">Change Nullability</option>
+                    <option value="default">Change Default Value (Lowest Risk)</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Select the type of schema change you plan to make
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div ref={columnDropdownRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsColumnDropdownOpen(!isColumnDropdownOpen)}
+                  className="w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-lg bg-white hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                >
+                  <span className="text-gray-500">
+                    {columnSearch || 'Select a column...'}
+                  </span>
+                  <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isColumnDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isColumnDropdownOpen && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
+                    <div className="p-2 border-b border-gray-200">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Type to search columns..."
+                          value={columnSearch}
+                          onChange={(e) => setColumnSearch(e.target.value)}
+                          className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          autoFocus
+                        />
+                      </div>
+                    </div>
+
+                    <div className="max-h-60 overflow-y-auto">
+                      {isLoadingColumns ? (
+                        <div className="px-4 py-8 text-center text-gray-500">
+                          Loading columns...
+                        </div>
+                      ) : columnsData && columnsData.length > 0 ? (
+                        columnsData.map((column: any) => (
+                          <button
+                            key={column.urn}
+                            onClick={() => {
+                              setSelectedColumnUrn(column.urn);
+                              setColumnSearch('');
+                              setIsColumnDropdownOpen(false);
+                            }}
+                            className="w-full px-4 py-2 text-left hover:bg-gray-50 border-b border-gray-100 last:border-0"
+                          >
+                            <div className="font-medium text-gray-900">
+                              {column.capsule_name || 'Unknown'} → {column.name}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {column.data_type}
+                              {column.description && ` • ${column.description}`}
+                            </div>
+                            <div className="text-xs text-gray-400 truncate font-mono">{column.urn}</div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-4 py-8 text-center text-gray-500">
+                          {columnSearch ? 'No columns found' : 'No columns available'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Task Impact Analysis Component */}
+          {selectedColumnUrn && (
+            <TaskImpactAnalysis
+              columnUrn={selectedColumnUrn}
+              changeType={changeType}
+              depth={5}
+            />
+          )}
+
+          {/* Help Section */}
+          {!selectedColumnUrn && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+              <h3 className="font-semibold text-blue-900 mb-2">How to Use Task Impact Analysis</h3>
+              <ol className="text-sm text-blue-800 space-y-2 list-decimal list-inside">
+                <li>Select a column using the search dropdown above</li>
+                <li>Choose the type of schema change you plan to make</li>
+                <li>Click "Analyze Impact" to see which Airflow tasks will be affected</li>
+                <li>Review risk scores, execution schedules, and temporal impact</li>
+                <li>Use the recommended maintenance windows to minimize disruption</li>
+              </ol>
+              <p className="text-sm text-blue-800 mt-3">
+                <strong>Use Case:</strong> Before making schema changes to a column, use this tool to understand
+                which Airflow tasks will break and when is the best time to deploy the change.
+              </p>
+              <p className="text-sm text-blue-800 mt-2">
+                <strong>Example:</strong> Renaming the <code className="bg-blue-100 px-1 rounded">account_code</code> column
+                in <code className="bg-blue-100 px-1 rounded">chart_of_accounts</code> will show you all the tasks
+                that read from this column and calculate the risk of breaking them.
+              </p>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

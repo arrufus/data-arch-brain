@@ -1,0 +1,432 @@
+# Airflow Data Flow Annotations - Production Configuration
+#
+# Updated for actual Airflow instance at http://localhost:8080
+# Generated: 2025-12-29
+#
+# This file maps Airflow tasks to the data assets they consume and produce.
+# It enables DCS to track which tasks depend on which tables/columns for
+# advanced impact analysis.
+
+pipelines:
+  # =========================================================================
+  # Finance GL Pipeline (finance_gl_pipeline)
+  # Schedule: Daily at 1:00 AM (0 1 * * *)
+  # Owner: finance_data_team
+  # =========================================================================
+  - pipeline_id: finance_gl_pipeline
+    instance: localhost-8080
+    description: "Daily GL transaction processing and revenue analytics"
+    tags:
+      - finance
+      - gl
+      - critical
+      - domain:finance
+
+    tasks:
+      # Task 1: Validate Chart of Accounts
+      - task_id: validate_chart_of_accounts
+        description: "Validates chart of accounts reference data integrity"
+        operator: PythonOperator
+
+        consumes:
+          - urn:dcs:postgres:table:finance.dim:chart_of_accounts
+
+        validates:
+          - urn:dcs:postgres:table:finance.dim:chart_of_accounts
+
+        criticality_score: 0.85
+        avg_execution_duration_seconds: 45
+        success_rate: 99.2
+
+        metadata:
+          validation_checks:
+            - no_duplicate_account_codes
+            - all_required_fields_populated
+            - valid_account_types
+            - parent_child_relationships
+          owner: finance_data_team
+
+      # Task 2: Load GL Transactions
+      - task_id: load_gl_transactions
+        description: "Loads GL transactions from staging to facts table with account code resolution"
+        operator: PythonOperator
+
+        consumes:
+          # Reference data
+          - urn:dcs:postgres:table:finance.dim:chart_of_accounts
+
+          # Source data (incremental)
+          - urn: urn:dcs:postgres:table:finance.staging:raw_transactions
+            access_pattern: incremental
+            read_mode: append_only
+            filter_condition: "posted_date >= CURRENT_DATE - INTERVAL '1 day'"
+
+        produces:
+          - urn: urn:dcs:postgres:table:finance.facts:gl_transactions
+            operation: insert
+            write_mode: append
+            row_estimate: 5000
+
+        criticality_score: 0.95
+        avg_execution_duration_seconds: 180
+        success_rate: 98.1
+
+        # SQL for column-level lineage
+        sql_queries:
+          - |
+            INSERT INTO facts.gl_transactions (
+              transaction_id,
+              account_id,
+              account_code,
+              amount,
+              transaction_date,
+              description,
+              source_system,
+              created_by,
+              created_at
+            )
+            SELECT
+              t.id AS transaction_id,
+              c.account_id,
+              c.account_code,
+              t.amount,
+              t.posted_date AS transaction_date,
+              t.description,
+              t.source_system,
+              'airflow_etl' AS created_by,
+              CURRENT_TIMESTAMP AS created_at
+            FROM staging.raw_transactions t
+            INNER JOIN dim.chart_of_accounts c
+              ON t.account_code = c.account_code
+            WHERE t.posted_date >= CURRENT_DATE - INTERVAL '1 day'
+              AND t.status = 'approved'
+              AND t.amount IS NOT NULL
+              AND c.is_active = TRUE
+
+      # Task 3: Check Double Entry Balance
+      - task_id: check_double_entry_balance
+        description: "Validates double-entry accounting principles (debits = credits)"
+        operator: PythonOperator
+
+        consumes:
+          - urn:dcs:postgres:table:finance.facts:gl_transactions
+
+        validates:
+          - urn:dcs:postgres:table:finance.facts:gl_transactions
+
+        criticality_score: 0.90
+        avg_execution_duration_seconds: 60
+        success_rate: 99.8
+
+        metadata:
+          validation_rules:
+            - total_debits_equals_credits
+            - no_orphan_transactions
+            - all_amounts_non_zero
+          alert_on_failure: true
+          notify: ["finance_team@example.com"]
+
+      # Task 4: Generate Revenue by Month
+      - task_id: generate_revenue_by_month
+        description: "Aggregates revenue transactions by month for reporting"
+        operator: PythonOperator
+
+        consumes:
+          - urn:dcs:postgres:table:finance.facts:gl_transactions
+          - urn:dcs:postgres:table:finance.dim:chart_of_accounts
+
+        produces:
+          - urn: urn:dcs:postgres:table:finance.reports:revenue_by_month
+            operation: upsert
+            write_mode: replace
+            partition_key: report_month
+
+        criticality_score: 0.80
+        avg_execution_duration_seconds: 90
+        success_rate: 97.5
+
+        sql_queries:
+          - |
+            INSERT INTO reports.revenue_by_month (
+              report_month,
+              account_id,
+              account_code,
+              account_name,
+              total_revenue,
+              transaction_count,
+              avg_transaction_amount,
+              generated_at
+            )
+            SELECT
+              DATE_TRUNC('month', t.transaction_date) AS report_month,
+              c.account_id,
+              c.account_code,
+              c.account_name,
+              SUM(ABS(t.amount)) AS total_revenue,
+              COUNT(*) AS transaction_count,
+              AVG(ABS(t.amount)) AS avg_transaction_amount,
+              CURRENT_TIMESTAMP AS generated_at
+            FROM facts.gl_transactions t
+            INNER JOIN dim.chart_of_accounts c
+              ON t.account_id = c.account_id
+            WHERE c.account_type = 'Revenue'
+              AND t.transaction_date >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '12 months'
+            GROUP BY DATE_TRUNC('month', t.transaction_date), c.account_id, c.account_code, c.account_name
+            ON CONFLICT (report_month, account_id)
+            DO UPDATE SET
+              total_revenue = EXCLUDED.total_revenue,
+              transaction_count = EXCLUDED.transaction_count,
+              avg_transaction_amount = EXCLUDED.avg_transaction_amount,
+              generated_at = EXCLUDED.generated_at
+
+      # Task 5: Validate Revenue SLA
+      - task_id: validate_revenue_sla
+        description: "Validates revenue reporting meets SLA requirements (completeness, timeliness)"
+        operator: PythonOperator
+
+        consumes:
+          - urn:dcs:postgres:table:finance.reports:revenue_by_month
+
+        validates:
+          - urn:dcs:postgres:table:finance.reports:revenue_by_month
+
+        criticality_score: 0.75
+        avg_execution_duration_seconds: 30
+        success_rate: 99.5
+
+        metadata:
+          sla_checks:
+            - data_completeness_threshold: 95
+            - report_generation_time_max_minutes: 15
+            - data_freshness_max_hours: 2
+          escalation_enabled: true
+
+      # Task 6: Notify Finance Team
+      - task_id: notify_finance_team
+        description: "Sends completion notification to finance team"
+        operator: PythonOperator
+
+        consumes:
+          - urn:dcs:postgres:table:finance.reports:revenue_by_month
+
+        criticality_score: 0.50
+        avg_execution_duration_seconds: 5
+        success_rate: 99.9
+
+        metadata:
+          notification_channels:
+            - email
+            - slack
+          recipients:
+            - finance_team@example.com
+            - finance-alerts slack channel
+
+  # =========================================================================
+  # Customer Analytics Pipeline (customer_analytics_pipeline)
+  # Schedule: Daily at 2:00 AM (0 2 * * *)
+  # Owner: data_engineering
+  # =========================================================================
+  - pipeline_id: customer_analytics_pipeline
+    instance: localhost-8080
+    description: "Customer analytics data pipeline powered by dbt"
+    tags:
+      - analytics
+      - dbt
+      - customer
+      - bronze
+      - silver
+
+    tasks:
+      # dbt pipeline tasks
+      - task_id: dbt_seed
+        description: "Loads seed data (reference tables) into warehouse"
+        operator: BashOperator
+
+        produces:
+          - urn: urn:dcs:dbt:seed:customer_segments
+            operation: load
+          - urn: urn:dcs:dbt:seed:product_categories
+            operation: load
+
+        criticality_score: 0.70
+        avg_execution_duration_seconds: 30
+        success_rate: 99.8
+
+      - task_id: dbt_run_bronze
+        description: "Runs dbt bronze layer models (raw data ingestion)"
+        operator: BashOperator
+
+        consumes:
+          - urn:dcs:postgres:table:sources.crm:raw_customers
+          - urn:dcs:postgres:table:sources.crm:raw_orders
+
+        produces:
+          - urn:dcs:dbt:model:bronze.customers
+          - urn:dcs:dbt:model:bronze.orders
+          - urn:dcs:dbt:model:bronze.order_items
+
+        criticality_score: 0.85
+        avg_execution_duration_seconds: 120
+        success_rate: 98.5
+
+      - task_id: dbt_test_bronze
+        description: "Runs dbt tests on bronze models"
+        operator: BashOperator
+
+        validates:
+          - urn:dcs:dbt:model:bronze.customers
+          - urn:dcs:dbt:model:bronze.orders
+          - urn:dcs:dbt:model:bronze.order_items
+
+        criticality_score: 0.80
+        avg_execution_duration_seconds: 45
+        success_rate: 97.2
+
+      - task_id: dbt_run_silver
+        description: "Runs dbt silver layer models (cleaned and transformed)"
+        operator: BashOperator
+
+        consumes:
+          - urn:dcs:dbt:model:bronze.customers
+          - urn:dcs:dbt:model:bronze.orders
+          - urn:dcs:dbt:model:bronze.order_items
+          - urn:dcs:dbt:seed:customer_segments
+
+        produces:
+          - urn:dcs:dbt:model:silver.dim_customers
+          - urn:dcs:dbt:model:silver.fact_orders
+          - urn:dcs:dbt:model:silver.customer_lifetime_value
+
+        criticality_score: 0.90
+        avg_execution_duration_seconds: 180
+        success_rate: 98.0
+
+      - task_id: dbt_test_silver
+        description: "Runs dbt tests on silver models"
+        operator: BashOperator
+
+        validates:
+          - urn:dcs:dbt:model:silver.dim_customers
+          - urn:dcs:dbt:model:silver.fact_orders
+          - urn:dcs:dbt:model:silver.customer_lifetime_value
+
+        criticality_score: 0.85
+        avg_execution_duration_seconds: 60
+        success_rate: 96.8
+
+      - task_id: dbt_docs_generate
+        description: "Generates dbt documentation"
+        operator: BashOperator
+
+        consumes:
+          - urn:dcs:dbt:model:bronze.customers
+          - urn:dcs:dbt:model:bronze.orders
+          - urn:dcs:dbt:model:silver.dim_customers
+          - urn:dcs:dbt:model:silver.fact_orders
+
+        produces:
+          - urn:dcs:dbt:docs:catalog
+          - urn:dcs:dbt:docs:manifest
+
+        criticality_score: 0.60
+        avg_execution_duration_seconds: 45
+        success_rate: 99.5
+
+  # =========================================================================
+  # Cross-Domain Analytics Pipeline (cross_domain_analytics_pipeline)
+  # Schedule: Daily at 4:00 AM (0 4 * * *)
+  # Owner: analytics_team
+  # =========================================================================
+  - pipeline_id: cross_domain_analytics_pipeline
+    instance: localhost-8080
+    description: "Cross-domain analytics combining finance and customer data"
+    tags:
+      - analytics
+      - cross-domain
+      - customer
+      - finance
+      - data-mesh
+
+    tasks:
+      - task_id: join_customer_revenue
+        description: "Joins customer data with revenue data for analytics"
+        operator: PythonOperator
+
+        consumes:
+          - urn:dcs:dbt:model:silver.dim_customers
+          - urn:dcs:postgres:table:finance.facts:gl_transactions
+          - urn:dcs:postgres:table:finance.dim:chart_of_accounts
+
+        produces:
+          - urn:dcs:postgres:table:analytics.facts:customer_revenue
+
+        criticality_score: 0.85
+        avg_execution_duration_seconds: 240
+        success_rate: 97.8
+
+        sql_queries:
+          - |
+            INSERT INTO analytics.customer_revenue (
+              customer_id,
+              customer_name,
+              account_id,
+              account_code,
+              revenue_amount,
+              transaction_date,
+              created_at
+            )
+            SELECT
+              c.customer_id,
+              c.customer_name,
+              t.account_id,
+              a.account_code,
+              SUM(ABS(t.amount)) AS revenue_amount,
+              t.transaction_date,
+              CURRENT_TIMESTAMP AS created_at
+            FROM silver.dim_customers c
+            CROSS JOIN facts.gl_transactions t
+            INNER JOIN dim.chart_of_accounts a
+              ON t.account_id = a.account_id
+            WHERE a.account_type = 'Revenue'
+              AND t.transaction_date >= CURRENT_DATE - INTERVAL '90 days'
+            GROUP BY c.customer_id, c.customer_name, t.account_id, a.account_code, t.transaction_date
+
+      - task_id: calculate_customer_profitability
+        description: "Calculates profitability metrics per customer"
+        operator: PythonOperator
+
+        consumes:
+          - urn:dcs:postgres:table:analytics.facts:customer_revenue
+          - urn:dcs:dbt:model:silver.customer_lifetime_value
+
+        produces:
+          - urn:dcs:postgres:table:analytics.reports:customer_profitability
+
+        criticality_score: 0.80
+        avg_execution_duration_seconds: 150
+        success_rate: 98.5
+
+# =========================================================================
+# Global Settings
+# =========================================================================
+settings:
+  # Default values applied to all tasks if not specified
+  default_criticality_score: 0.70
+  default_success_rate: 95.0
+  default_avg_execution_duration_seconds: 120
+
+  # Feature flags
+  enable_sql_parsing: true
+  enable_column_lineage: true
+  track_execution_history: true
+  generate_impact_alerts: true
+
+  # URN prefixes
+  urn_prefix: "urn:dcs"
+  database_platform: "postgres"
+  default_schema: "public"
+
+  # Instance metadata
+  airflow_instance: "localhost-8080"
+  environment: "development"
+  last_updated: "2025-12-29"

@@ -138,6 +138,113 @@ class RawTag:
 
 
 @dataclass
+class RawPipeline:
+    """Raw pipeline data for orchestration workflows (Airflow DAGs, etc.)."""
+
+    urn: str
+    name: str
+    pipeline_type: str  # airflow_dag, dbt_run, databricks_job, etc.
+    source_system_identifier: str  # Original ID in source system (e.g., DAG ID)
+
+    # Optional metadata
+    description: Optional[str] = None
+    schedule_interval: Optional[str] = None
+    owners: list[str] = field(default_factory=list)
+    is_paused: bool = False
+    is_active: bool = True
+
+    # Metadata
+    tags: list[str] = field(default_factory=list)
+    meta: dict[str, Any] = field(default_factory=dict)
+    config: dict[str, Any] = field(default_factory=dict)
+
+    # Domain inference
+    domain_name: Optional[str] = None
+
+
+@dataclass
+class RawPipelineTask:
+    """Raw pipeline task data (task within a workflow)."""
+
+    urn: str
+    name: str
+    task_type: str  # python, sql, dbt, bash, sensor, etc.
+    pipeline_urn: str  # Parent pipeline URN
+
+    # Optional metadata
+    description: Optional[str] = None
+    operator: Optional[str] = None  # e.g., PythonOperator, DbtRunOperator
+    operation_type: Optional[str] = None  # extract, transform, load, validate, etc.
+
+    # Retry and timeout configuration
+    retries: int = 0
+    retry_delay_seconds: Optional[int] = None
+    timeout_seconds: Optional[int] = None
+
+    # Tool integration (for deep dbt/SQL integration)
+    tool_reference: Optional[dict[str, Any]] = None
+
+    # Metadata
+    meta: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class RawOrchestrationEdge:
+    """Raw edge data for orchestration relationships.
+
+    Supports three edge types:
+    - task_dependency: Task -> Task (DEPENDS_ON)
+    - task_data: Task -> DataCapsule (PRODUCES/CONSUMES/TRANSFORMS/VALIDATES)
+    - pipeline_trigger: Pipeline -> Pipeline (TRIGGERS)
+    """
+
+    source_urn: str
+    target_urn: str
+    edge_category: str  # "task_dependency", "task_data", "pipeline_trigger"
+    edge_type: str  # depends_on, produces, consumes, transforms, validates, triggers
+
+    # Edge-specific metadata
+    operation: Optional[str] = None  # For task_data edges: insert, update, select, etc.
+    access_pattern: Optional[str] = None  # For task_data edges: full_scan, selective, etc.
+    transformation_type: Optional[str] = None  # For task_data edges
+    validation_type: Optional[str] = None  # For task_data edges
+
+    # General metadata
+    meta: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class RawColumnMapping:
+    """Raw column-level lineage mapping (Phase 6).
+
+    Represents a source-to-target column mapping detected from SQL,
+    dbt, or manual annotations.
+    """
+
+    # Source columns (can be multiple for joins/aggregates)
+    source_columns: list[str]  # Qualified names: "table.column" or "schema.table.column"
+
+    # Target column
+    target_column: str  # Column name (or alias)
+
+    # Transformation metadata
+    transformation_type: str  # identity, cast, aggregate, formula, etc.
+    transformation_logic: Optional[str] = None  # SQL expression
+
+    # Detection metadata
+    confidence: float = 1.0  # 0.0 to 1.0
+    detected_by: str = "sql_parser"  # sql_parser, dbt_metadata, manual
+
+    # Context (optional)
+    task_urn: Optional[str] = None  # Task that performs this transformation
+    source_capsule_urn: Optional[str] = None  # Source capsule URN
+    target_capsule_urn: Optional[str] = None  # Target capsule URN
+
+    # Additional metadata
+    meta: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class ParseResult:
     """Result of parsing metadata from a source."""
 
@@ -147,12 +254,22 @@ class ParseResult:
     column_edges: list[RawColumnEdge] = field(default_factory=list)
     domains: list[RawDomain] = field(default_factory=list)
     tags: list[RawTag] = field(default_factory=list)
+
+    # Orchestration metadata (Airflow Integration)
+    pipelines: list[RawPipeline] = field(default_factory=list)
+    pipeline_tasks: list[RawPipelineTask] = field(default_factory=list)
+    orchestration_edges: list[RawOrchestrationEdge] = field(default_factory=list)
+
+    # Phase 6: Column-level lineage mappings
+    column_mappings: list[RawColumnMapping] = field(default_factory=list)
+
     errors: list[ParseError] = field(default_factory=list)
 
     # Metadata about the parse
     source_type: str = ""
     source_name: str = ""
     source_version: Optional[str] = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def has_errors(self) -> bool:
@@ -195,6 +312,9 @@ class ParseResult:
             "column_edges": len(self.column_edges),
             "domains": len(self.domains),
             "tags": len(self.tags),
+            "pipelines": len(self.pipelines),
+            "pipeline_tasks": len(self.pipeline_tasks),
+            "orchestration_edges": len(self.orchestration_edges),
             "warnings": self.warning_count,
             "errors": self.error_count,
         }

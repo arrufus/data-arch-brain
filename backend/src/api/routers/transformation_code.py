@@ -91,6 +91,7 @@ async def create_transformation_code(
 async def list_transformation_code(
     db: DbSession,
     capsule_id: Optional[str] = Query(None),
+    capsule_urn: Optional[str] = Query(None, description="Filter by capsule URN"),
     lineage_edge_id: Optional[str] = Query(None),
     language: Optional[str] = Query(None),
     offset: int = Query(0, ge=0),
@@ -99,9 +100,17 @@ async def list_transformation_code(
     """List transformation code with filters."""
     repo = TransformationCodeRepository(db)
 
-    if capsule_id:
-        codes = await repo.get_by_capsule(UUID(capsule_id), offset, limit)
-        total = await repo.count_by_capsule(UUID(capsule_id))
+    # Resolve URN to ID if needed
+    resolved_capsule_id = capsule_id
+    if capsule_urn and not capsule_id:
+        capsule_repo = CapsuleRepository(db)
+        capsule = await capsule_repo.get_by_urn(capsule_urn)
+        if capsule:
+            resolved_capsule_id = str(capsule.id)
+
+    if resolved_capsule_id:
+        codes = await repo.get_by_capsule(UUID(resolved_capsule_id), offset, limit)
+        total = await repo.count_by_capsule(UUID(resolved_capsule_id))
     elif lineage_edge_id:
         codes = await repo.get_by_lineage_edge(UUID(lineage_edge_id), offset, limit)
         total = await repo.count_by_lineage_edge(UUID(lineage_edge_id))
@@ -135,6 +144,47 @@ async def get_transformation_code(db: DbSession, code_id: str) -> Transformation
     code = await repo.get_by_id(UUID(code_id))
     if not code:
         raise NotFoundError("TransformationCode", code_id)
+
+    return TransformationCodeDetail(
+        id=str(code.id),
+        capsule_id=str(code.capsule_id) if code.capsule_id else None,
+        lineage_edge_id=str(code.lineage_edge_id) if code.lineage_edge_id else None,
+        language=code.language,
+        code_text=code.code_text,
+        code_hash=code.code_hash,
+        function_name=code.function_name,
+        file_path=code.file_path,
+        line_start=code.line_start,
+        line_end=code.line_end,
+        git_commit_sha=code.git_commit_sha,
+        git_repository=code.git_repository,
+        upstream_references=code.upstream_references,
+        function_calls=code.function_calls,
+        meta=code.meta,
+        created_at=code.created_at.isoformat(),
+        updated_at=code.updated_at.isoformat(),
+    )
+
+
+@router.patch("/{code_id}", response_model=TransformationCodeDetail)
+async def update_transformation_code(
+    db: DbSession,
+    code_id: str,
+    updates: TransformationCodeUpdate,
+) -> TransformationCodeDetail:
+    """Update transformation code."""
+    repo = TransformationCodeRepository(db)
+    code = await repo.get_by_id(UUID(code_id))
+    if not code:
+        raise NotFoundError("TransformationCode", code_id)
+
+    # Apply updates
+    update_dict = updates.model_dump(exclude_unset=True)
+    for field, value in update_dict.items():
+        setattr(code, field, value)
+
+    await repo.update(code)
+    await db.commit()
 
     return TransformationCodeDetail(
         id=str(code.id),

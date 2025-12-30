@@ -47,6 +47,34 @@ class AirflowIngestRequest(BaseModel):
     cleanup_orphans: bool = False
 
 
+class SnowflakeIngestRequest(BaseModel):
+    """Request body for Snowflake ingestion via REST API.
+
+    Authentication credentials can be provided via:
+    - password field (for development/testing)
+    - password_env field (reads from environment variable)
+    - private_key_path (path to key file on server)
+    """
+
+    account: str
+    user: str
+    warehouse: str = "COMPUTE_WH"
+    role: str = "SYSADMIN"
+    password: Optional[str] = None
+    password_env: str = "SNOWFLAKE_PASSWORD"
+    private_key_path: Optional[str] = None
+    databases: list[str] = []
+    schemas: list[str] = []
+    include_views: bool = True
+    include_materialized_views: bool = True
+    include_external_tables: bool = True
+    enable_lineage: bool = False
+    lineage_lookback_days: int = 7
+    use_account_usage: bool = False
+    enable_tag_extraction: bool = False
+    cleanup_orphans: bool = False
+
+
 class IngestionStats(BaseModel):
     """Statistics from an ingestion job."""
 
@@ -189,6 +217,79 @@ async def ingest_airflow(
         page_limit=request.page_limit,
         timeout_seconds=request.timeout_seconds,
         domain_tag_prefix=request.domain_tag_prefix,
+        cleanup_orphans=request.cleanup_orphans,
+    )
+
+    response = IngestionResponse(
+        job_id=result.job_id,
+        status=result.status.value,
+        source_type=result.source_type,
+        source_name=result.source_name,
+        stats=IngestionStats.from_service(result.stats),
+        duration_seconds=result.duration_seconds,
+    )
+
+    if result.error_message:
+        response.message = result.error_message
+
+    return response
+
+
+@router.post("/snowflake", response_model=IngestionResponse)
+async def ingest_snowflake(
+    request: SnowflakeIngestRequest,
+    db: DbSession,
+) -> IngestionResponse:
+    """
+    Ingest Snowflake table and column metadata from INFORMATION_SCHEMA and ACCOUNT_USAGE.
+
+    Authentication credentials should be provided via environment variables
+    for production security. The request specifies which env var to use (password_env).
+
+    Example:
+        {
+            "account": "myorg-account123",
+            "user": "dcs_service_user",
+            "password_env": "SNOWFLAKE_PASSWORD",
+            "warehouse": "METADATA_WH",
+            "databases": ["PROD", "ANALYTICS"],
+            "enable_lineage": true,
+            "use_account_usage": true
+        }
+
+    Note: For production use, prefer key-pair authentication over passwords.
+    Place the private key file on the server and reference it via private_key_path.
+    """
+    import os
+
+    service = IngestionService(db)
+
+    # Resolve password from environment if not provided directly
+    password = request.password
+    if not password and not request.private_key_path:
+        password = os.environ.get(request.password_env)
+        if not password:
+            raise IngestionError(
+                f"Password not found in environment variable {request.password_env}. "
+                "Either set the environment variable or provide private_key_path."
+            )
+
+    result = await service.ingest_snowflake(
+        account=request.account,
+        user=request.user,
+        warehouse=request.warehouse,
+        role=request.role,
+        password=password,
+        private_key_path=request.private_key_path,
+        databases=request.databases if request.databases else None,
+        schemas=request.schemas if request.schemas else None,
+        include_views=request.include_views,
+        include_materialized_views=request.include_materialized_views,
+        include_external_tables=request.include_external_tables,
+        enable_lineage=request.enable_lineage,
+        lineage_lookback_days=request.lineage_lookback_days,
+        use_account_usage=request.use_account_usage,
+        enable_tag_extraction=request.enable_tag_extraction,
         cleanup_orphans=request.cleanup_orphans,
     )
 

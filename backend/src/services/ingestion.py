@@ -7,12 +7,26 @@ from pathlib import Path
 from typing import Any, Optional
 from uuid import UUID
 
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.capsule import Capsule
 from src.models.column import Column
 from src.models.ingestion import IngestionJob, IngestionStatus
 from src.models.lineage import CapsuleLineage, ColumnLineage
+from src.models.orchestration_edge import (
+    OrchestrationEdgeType,
+    PipelineTriggerEdge,
+    TaskDataEdge,
+    TaskDependencyEdge,
+)
+from src.models.pipeline import (
+    Pipeline,
+    PipelineRun,
+    PipelineTask,
+    PipelineType,
+    TaskRun,
+)
 from src.parsers import DbtParser, ParseResult, get_parser
 from src.repositories import (
     CapsuleLineageRepository,
@@ -34,6 +48,10 @@ class ProcessedUrns:
     column_urns: set[str] = field(default_factory=set)
     edge_keys: set[tuple[str, str]] = field(default_factory=set)  # (source_urn, target_urn)
     column_edge_keys: set[tuple[str, str]] = field(default_factory=set)  # (source_col_urn, target_col_urn)
+    # Orchestration metadata (Airflow Integration)
+    pipeline_urns: set[str] = field(default_factory=set)
+    pipeline_task_urns: set[str] = field(default_factory=set)
+    orchestration_edge_keys: set[tuple[str, str]] = field(default_factory=set)  # (source_urn, target_urn)
 
 
 @dataclass
@@ -55,6 +73,16 @@ class IngestionStats:
     column_edges_deleted: int = 0
     domains_created: int = 0
     pii_columns_detected: int = 0
+    # Orchestration metadata (Airflow Integration)
+    pipelines_created: int = 0
+    pipelines_updated: int = 0
+    pipelines_deleted: int = 0
+    pipeline_tasks_created: int = 0
+    pipeline_tasks_updated: int = 0
+    pipeline_tasks_deleted: int = 0
+    orchestration_edges_created: int = 0
+    orchestration_edges_updated: int = 0
+    orchestration_edges_deleted: int = 0
     warnings: int = 0
     errors: int = 0
 
@@ -76,6 +104,15 @@ class IngestionStats:
             "column_edges_deleted": self.column_edges_deleted,
             "domains_created": self.domains_created,
             "pii_columns_detected": self.pii_columns_detected,
+            "pipelines_created": self.pipelines_created,
+            "pipelines_updated": self.pipelines_updated,
+            "pipelines_deleted": self.pipelines_deleted,
+            "pipeline_tasks_created": self.pipeline_tasks_created,
+            "pipeline_tasks_updated": self.pipeline_tasks_updated,
+            "pipeline_tasks_deleted": self.pipeline_tasks_deleted,
+            "orchestration_edges_created": self.orchestration_edges_created,
+            "orchestration_edges_updated": self.orchestration_edges_updated,
+            "orchestration_edges_deleted": self.orchestration_edges_deleted,
             "warnings": self.warnings,
             "errors": self.errors,
         }
@@ -87,7 +124,10 @@ class IngestionStats:
             self.capsules_created + self.capsules_updated + self.capsules_deleted +
             self.columns_created + self.columns_updated + self.columns_deleted +
             self.edges_created + self.edges_updated + self.edges_deleted +
-            self.column_edges_created + self.column_edges_updated + self.column_edges_deleted
+            self.column_edges_created + self.column_edges_updated + self.column_edges_deleted +
+            self.pipelines_created + self.pipelines_updated + self.pipelines_deleted +
+            self.pipeline_tasks_created + self.pipeline_tasks_updated + self.pipeline_tasks_deleted +
+            self.orchestration_edges_created + self.orchestration_edges_updated + self.orchestration_edges_deleted
         )
 
     def delta_summary(self) -> dict[str, dict[str, int]]:
@@ -112,6 +152,21 @@ class IngestionStats:
                 "created": self.column_edges_created,
                 "updated": self.column_edges_updated,
                 "deleted": self.column_edges_deleted,
+            },
+            "pipelines": {
+                "created": self.pipelines_created,
+                "updated": self.pipelines_updated,
+                "deleted": self.pipelines_deleted,
+            },
+            "pipeline_tasks": {
+                "created": self.pipeline_tasks_created,
+                "updated": self.pipeline_tasks_updated,
+                "deleted": self.pipeline_tasks_deleted,
+            },
+            "orchestration_edges": {
+                "created": self.orchestration_edges_created,
+                "updated": self.orchestration_edges_updated,
+                "deleted": self.orchestration_edges_deleted,
             },
         }
 
@@ -226,6 +281,94 @@ class IngestionService:
 
         return await self.ingest("airflow", config, cleanup_orphans=cleanup_orphans)
 
+    async def ingest_snowflake(
+        self,
+        account: str,
+        user: str,
+        warehouse: str = "COMPUTE_WH",
+        role: str = "SYSADMIN",
+        password: Optional[str] = None,
+        private_key_path: Optional[str] = None,
+        databases: Optional[list[str]] = None,
+        schemas: Optional[list[str]] = None,
+        include_views: bool = True,
+        include_materialized_views: bool = True,
+        include_external_tables: bool = True,
+        enable_lineage: bool = False,
+        lineage_lookback_days: int = 7,
+        use_account_usage: bool = False,
+        enable_tag_extraction: bool = False,
+        cleanup_orphans: bool = False,
+        **kwargs: Any,
+    ) -> IngestionResult:
+        """
+        Ingest Snowflake metadata from INFORMATION_SCHEMA and ACCOUNT_USAGE.
+
+        Args:
+            account: Snowflake account identifier (e.g., "myorg-account123")
+            user: Snowflake username
+            warehouse: Warehouse for metadata queries
+            role: Role for querying metadata
+            password: Password for authentication (use password OR private_key_path)
+            private_key_path: Path to private key file for key-pair authentication
+            databases: List of databases to scan (empty = all accessible)
+            schemas: List of schema patterns to include (e.g., ["PROD.*"])
+            include_views: Include views in ingestion
+            include_materialized_views: Include materialized views
+            include_external_tables: Include external tables
+            enable_lineage: Extract lineage from ACCESS_HISTORY (requires use_account_usage)
+            lineage_lookback_days: Days to look back for lineage (1-365)
+            use_account_usage: Use ACCOUNT_USAGE views (required for lineage & tags)
+            enable_tag_extraction: Extract Snowflake tags (requires use_account_usage)
+            cleanup_orphans: If True, delete capsules/columns from same source not in current parse
+            **kwargs: Additional configuration options (e.g., tag_mappings, layer_patterns)
+
+        Returns:
+            IngestionResult with job details and statistics
+
+        Example:
+            # With password authentication
+            await service.ingest_snowflake(
+                account="myorg-account123",
+                user="dcs_service_user",
+                password=os.environ["SNOWFLAKE_PASSWORD"],
+                databases=["PROD", "ANALYTICS"],
+            )
+
+            # With key-pair authentication
+            await service.ingest_snowflake(
+                account="myorg-account123",
+                user="dcs_service_user",
+                private_key_path="/path/to/rsa_key.p8",
+                databases=["PROD"],
+                enable_lineage=True,
+                use_account_usage=True,
+            )
+        """
+        config = {
+            "account": account,
+            "user": user,
+            "warehouse": warehouse,
+            "role": role,
+            "password": password,
+            "private_key_path": private_key_path,
+            "databases": databases or [],
+            "schemas": schemas or [],
+            "include_views": include_views,
+            "include_materialized_views": include_materialized_views,
+            "include_external_tables": include_external_tables,
+            "enable_lineage": enable_lineage,
+            "lineage_lookback_days": lineage_lookback_days,
+            "use_account_usage": use_account_usage,
+            "enable_tag_extraction": enable_tag_extraction,
+            **kwargs,
+        }
+
+        # Remove None values
+        config = {k: v for k, v in config.items() if v is not None}
+
+        return await self.ingest("snowflake", config, cleanup_orphans=cleanup_orphans)
+
     async def ingest(
         self,
         source_type: str,
@@ -313,11 +456,22 @@ class IngestionService:
             result.stats = stats
             result.completed_at = job.completed_at
 
-            logger.info(
+            # Build log message
+            log_parts = [
                 f"Ingestion completed: {stats.capsules_created} capsules created, "
                 f"{stats.capsules_updated} updated, {stats.capsules_deleted} deleted, "
                 f"{stats.columns_created} columns, {stats.edges_created} edges"
-            )
+            ]
+
+            # Add orchestration stats if any exist
+            if stats.pipelines_created > 0 or stats.pipeline_tasks_created > 0:
+                log_parts.append(
+                    f"; {stats.pipelines_created} pipelines, "
+                    f"{stats.pipeline_tasks_created} tasks, "
+                    f"{stats.orchestration_edges_created} orchestration edges"
+                )
+
+            logger.info("".join(log_parts))
 
         except Exception as e:
             logger.exception(f"Ingestion failed: {e}")
@@ -512,10 +666,507 @@ class IngestionService:
             else:
                 stats.column_edges_updated += 1
 
+        # Create/update orchestration metadata (Airflow pipelines and tasks)
+        urn_to_pipeline: dict[str, Pipeline] = {}
+
+        # Create/update pipelines
+        for raw_pipeline in parse_result.pipelines:
+            # Get domain_id if domain_name is provided
+            domain_id = None
+            if raw_pipeline.domain_name:
+                domain_id = domain_map.get(raw_pipeline.domain_name)
+
+            pipeline = Pipeline(
+                urn=raw_pipeline.urn,
+                name=raw_pipeline.name,
+                pipeline_type=raw_pipeline.pipeline_type,
+                source_system_id=source_system_id,
+                source_system_identifier=raw_pipeline.source_system_identifier,
+                schedule_interval=raw_pipeline.schedule_interval,
+                owners=raw_pipeline.owners,
+                description=raw_pipeline.description,
+                is_paused=raw_pipeline.is_paused,
+                is_active=raw_pipeline.is_active,
+                config=raw_pipeline.config,
+                meta=raw_pipeline.meta,
+                ingestion_id=job.id,
+            )
+
+            # Check if pipeline already exists
+            result = await self.session.execute(
+                select(Pipeline).where(Pipeline.urn == raw_pipeline.urn)
+            )
+            existing_pipeline = result.scalar_one_or_none()
+            if existing_pipeline:
+                # Update existing
+                for key, value in pipeline.__dict__.items():
+                    if key not in ["_sa_instance_state", "id", "created_at"]:
+                        setattr(existing_pipeline, key, value)
+                existing_pipeline.updated_at = datetime.utcnow()
+                existing_pipeline.last_seen = datetime.utcnow()
+                pipeline = existing_pipeline
+                stats.pipelines_updated += 1
+            else:
+                # Create new
+                self.session.add(pipeline)
+                await self.session.flush()  # Flush to get ID
+                stats.pipelines_created += 1
+
+            urn_to_pipeline[raw_pipeline.urn] = pipeline
+            processed.pipeline_urns.add(raw_pipeline.urn)
+
+        # Create/update pipeline tasks
+        urn_to_task: dict[str, PipelineTask] = {}
+        for raw_task in parse_result.pipeline_tasks:
+            # Get pipeline_id from parent pipeline URN
+            parent_pipeline = urn_to_pipeline.get(raw_task.pipeline_urn)
+            if not parent_pipeline:
+                # Try to find in database
+                existing = await self.session.execute(
+                    select(Pipeline).where(Pipeline.urn == raw_task.pipeline_urn)
+                )
+                parent_pipeline = existing.scalar_one_or_none()
+
+            if not parent_pipeline:
+                logger.warning(
+                    f"Could not create task {raw_task.urn}: parent pipeline {raw_task.pipeline_urn} not found"
+                )
+                continue
+
+            # Convert retry_delay_seconds to timedelta
+            retry_delay = None
+            if raw_task.retry_delay_seconds:
+                from datetime import timedelta
+                retry_delay = timedelta(seconds=raw_task.retry_delay_seconds)
+
+            # Convert timeout_seconds to timedelta
+            timeout = None
+            if raw_task.timeout_seconds:
+                from datetime import timedelta
+                timeout = timedelta(seconds=raw_task.timeout_seconds)
+
+            task = PipelineTask(
+                urn=raw_task.urn,
+                name=raw_task.name,
+                task_type=raw_task.task_type,
+                pipeline_id=parent_pipeline.id,
+                pipeline_urn=raw_task.pipeline_urn,
+                operator=raw_task.operator,
+                operation_type=raw_task.operation_type,
+                retries=raw_task.retries,
+                retry_delay=retry_delay,
+                timeout=timeout,
+                tool_reference=raw_task.tool_reference,
+                description=raw_task.description,
+                meta=raw_task.meta,
+                ingestion_id=job.id,
+            )
+
+            # Check if task already exists
+            result = await self.session.execute(
+                select(PipelineTask).where(PipelineTask.urn == raw_task.urn)
+            )
+            existing_task = result.scalar_one_or_none()
+            if existing_task:
+                # Update existing
+                for key, value in task.__dict__.items():
+                    if key not in ["_sa_instance_state", "id", "created_at"]:
+                        setattr(existing_task, key, value)
+                existing_task.updated_at = datetime.utcnow()
+                task = existing_task
+                stats.pipeline_tasks_updated += 1
+            else:
+                # Create new
+                self.session.add(task)
+                await self.session.flush()  # Flush to get ID
+                stats.pipeline_tasks_created += 1
+
+            urn_to_task[raw_task.urn] = task
+            processed.pipeline_task_urns.add(raw_task.urn)
+
+        # Create orchestration edges
+        for raw_orch_edge in parse_result.orchestration_edges:
+            edge_category = raw_orch_edge.edge_category
+            edge_type = raw_orch_edge.edge_type
+
+            # Determine which edge table to use based on category
+            if edge_category == "task_dependency":
+                # TaskDependencyEdge (task→task)
+                if edge_type == "contains":
+                    # Pipeline CONTAINS Task - Skip creating edge as this relationship
+                    # is already established via pipeline_id foreign key in PipelineTask
+                    logger.debug(
+                        f"Skipping CONTAINS edge (handled by FK): {raw_orch_edge.source_urn} -> {raw_orch_edge.target_urn}"
+                    )
+                    continue
+
+                else:
+                    # Task DEPENDS_ON Task
+                    source_task = urn_to_task.get(raw_orch_edge.source_urn)
+                    target_task = urn_to_task.get(raw_orch_edge.target_urn)
+
+                    if not source_task:
+                        result = await self.session.execute(
+                            select(PipelineTask).where(PipelineTask.urn == raw_orch_edge.source_urn)
+                        )
+                        source_task = result.scalar_one_or_none()
+                    if not target_task:
+                        result = await self.session.execute(
+                            select(PipelineTask).where(PipelineTask.urn == raw_orch_edge.target_urn)
+                        )
+                        target_task = result.scalar_one_or_none()
+
+                    if not source_task or not target_task:
+                        logger.debug(
+                            f"Could not create DEPENDS_ON edge: {raw_orch_edge.source_urn} -> {raw_orch_edge.target_urn}"
+                        )
+                        continue
+
+                    # Check if edge already exists
+                    result = await self.session.execute(
+                        select(TaskDependencyEdge).where(
+                            and_(
+                                TaskDependencyEdge.source_task_urn == raw_orch_edge.source_urn,
+                                TaskDependencyEdge.target_task_urn == raw_orch_edge.target_urn,
+                            )
+                        )
+                    )
+                    existing_edge = result.scalar_one_or_none()
+
+                    if not existing_edge:
+                        edge = TaskDependencyEdge(
+                            source_task_urn=raw_orch_edge.source_urn,
+                            target_task_urn=raw_orch_edge.target_urn,
+                            source_task_id=source_task.id,
+                            target_task_id=target_task.id,
+                            edge_type=edge_type,
+                            meta=raw_orch_edge.meta,
+                            ingestion_id=job.id,
+                        )
+                        self.session.add(edge)
+                        stats.orchestration_edges_created += 1
+                    else:
+                        # Update existing
+                        existing_edge.meta = raw_orch_edge.meta
+                        existing_edge.ingestion_id = job.id
+                        stats.orchestration_edges_updated += 1
+
+                processed.orchestration_edge_keys.add((raw_orch_edge.source_urn, raw_orch_edge.target_urn))
+
+            elif edge_category == "task_data":
+                # TaskDataEdge (task↔capsule) - handles PRODUCES, CONSUMES, TRANSFORMS, VALIDATES
+                # For PRODUCES/TRANSFORMS/VALIDATES: source=task, target=capsule
+                # For CONSUMES: source=capsule, target=task
+
+                # Determine task and capsule URNs based on edge type
+                if edge_type == "consumes":
+                    # CONSUMES: capsule → task
+                    task_urn = raw_orch_edge.target_urn
+                    capsule_urn = raw_orch_edge.source_urn
+                else:
+                    # PRODUCES/TRANSFORMS/VALIDATES: task → capsule
+                    task_urn = raw_orch_edge.source_urn
+                    capsule_urn = raw_orch_edge.target_urn
+
+                # Look up task
+                task = urn_to_task.get(task_urn)
+                if not task:
+                    result = await self.session.execute(
+                        select(PipelineTask).where(PipelineTask.urn == task_urn)
+                    )
+                    task = result.scalar_one_or_none()
+
+                # Look up capsule
+                capsule = urn_to_capsule.get(capsule_urn)
+                if not capsule:
+                    capsule = await self.capsule_repo.get_by_urn(capsule_urn)
+
+                if not task or not capsule:
+                    logger.debug(
+                        f"Could not create task_data edge ({edge_type}): task={task_urn}, capsule={capsule_urn}"
+                    )
+                    continue
+
+                # Check if edge already exists
+                result = await self.session.execute(
+                    select(TaskDataEdge).where(
+                        and_(
+                            TaskDataEdge.task_urn == task_urn,
+                            TaskDataEdge.capsule_urn == capsule_urn,
+                            TaskDataEdge.edge_type == edge_type,
+                        )
+                    )
+                )
+                existing_edge = result.scalar_one_or_none()
+
+                if not existing_edge:
+                    edge = TaskDataEdge(
+                        task_urn=task_urn,
+                        capsule_urn=capsule_urn,
+                        task_id=task.id,
+                        capsule_id=capsule.id,
+                        edge_type=edge_type,  # produces, consumes, transforms, validates
+                        operation=raw_orch_edge.operation,
+                        access_pattern=raw_orch_edge.access_pattern,
+                        transformation_type=raw_orch_edge.transformation_type,
+                        validation_type=raw_orch_edge.validation_type,
+                        meta=raw_orch_edge.meta,
+                        ingestion_id=job.id,
+                    )
+                    self.session.add(edge)
+                    stats.orchestration_edges_created += 1
+                    logger.debug(f"Created TaskDataEdge: {edge_type} task={task_urn} capsule={capsule_urn}")
+                else:
+                    # Update existing
+                    existing_edge.operation = raw_orch_edge.operation
+                    existing_edge.access_pattern = raw_orch_edge.access_pattern
+                    existing_edge.transformation_type = raw_orch_edge.transformation_type
+                    existing_edge.validation_type = raw_orch_edge.validation_type
+                    existing_edge.meta = raw_orch_edge.meta
+                    existing_edge.ingestion_id = job.id
+                    stats.orchestration_edges_updated += 1
+
+                processed.orchestration_edge_keys.add((raw_orch_edge.source_urn, raw_orch_edge.target_urn))
+
+            elif edge_category == "pipeline_trigger":
+                # PipelineTriggerEdge (pipeline→pipeline)
+                source_pipeline = urn_to_pipeline.get(raw_orch_edge.source_urn)
+                target_pipeline = urn_to_pipeline.get(raw_orch_edge.target_urn)
+
+                if not source_pipeline:
+                    result = await self.session.execute(
+                        select(Pipeline).where(Pipeline.urn == raw_orch_edge.source_urn)
+                    )
+                    source_pipeline = result.scalar_one_or_none()
+                if not target_pipeline:
+                    result = await self.session.execute(
+                        select(Pipeline).where(Pipeline.urn == raw_orch_edge.target_urn)
+                    )
+                    target_pipeline = result.scalar_one_or_none()
+
+                if not source_pipeline or not target_pipeline:
+                    logger.debug(
+                        f"Could not create pipeline_trigger edge: {raw_orch_edge.source_urn} -> {raw_orch_edge.target_urn}"
+                    )
+                    continue
+
+                # Check if edge already exists
+                result = await self.session.execute(
+                    select(PipelineTriggerEdge).where(
+                        and_(
+                            PipelineTriggerEdge.source_pipeline_urn == raw_orch_edge.source_urn,
+                            PipelineTriggerEdge.target_pipeline_urn == raw_orch_edge.target_urn,
+                        )
+                    )
+                )
+                existing_edge = result.scalar_one_or_none()
+
+                if not existing_edge:
+                    edge = PipelineTriggerEdge(
+                        source_pipeline_urn=raw_orch_edge.source_urn,
+                        target_pipeline_urn=raw_orch_edge.target_urn,
+                        source_pipeline_id=source_pipeline.id,
+                        target_pipeline_id=target_pipeline.id,
+                        edge_type=edge_type,  # triggers
+                        meta=raw_orch_edge.meta,
+                        ingestion_id=job.id,
+                    )
+                    self.session.add(edge)
+                    stats.orchestration_edges_created += 1
+                else:
+                    # Update existing
+                    existing_edge.meta = raw_orch_edge.meta
+                    existing_edge.ingestion_id = job.id
+                    stats.orchestration_edges_updated += 1
+
+                processed.orchestration_edge_keys.add((raw_orch_edge.source_urn, raw_orch_edge.target_urn))
+
+        # Phase 6: Store column-level lineage mappings
+        for raw_mapping in parse_result.column_mappings:
+            await self._store_column_mapping(
+                raw_mapping=raw_mapping,
+                job=job,
+                urn_to_capsule=urn_to_capsule,
+                stats=stats,
+            )
+
         # Flush all changes
         await self.session.flush()
-        
+
         return processed
+
+    async def _store_column_mapping(
+        self,
+        raw_mapping: "RawColumnMapping",  # type: ignore
+        job: IngestionJob,
+        urn_to_capsule: dict[str, Capsule],
+        stats: IngestionStats,
+    ) -> None:
+        """Store a column-level lineage mapping (Phase 6.5).
+
+        Args:
+            raw_mapping: Raw column mapping from parser
+            job: Current ingestion job
+            urn_to_capsule: Map of capsule URNs to Capsule objects
+            stats: Ingestion statistics to update
+        """
+        from sqlalchemy import and_, select
+
+        from src.models.column import Column
+        from src.models.lineage import ColumnLineage
+
+        try:
+            # Resolve target column first
+            target_column_id = await self._resolve_column_id(
+                qualified_name=raw_mapping.target_column,
+                urn_to_capsule=urn_to_capsule,
+            )
+
+            if not target_column_id:
+                logger.debug(
+                    f"Could not resolve target column '{raw_mapping.target_column}' - skipping lineage storage"
+                )
+                return
+
+            # Process each source column
+            for source_col_name in raw_mapping.source_columns:
+                source_column_id = await self._resolve_column_id(
+                    qualified_name=source_col_name,
+                    urn_to_capsule=urn_to_capsule,
+                )
+
+                if not source_column_id:
+                    logger.debug(
+                        f"Could not resolve source column '{source_col_name}' - skipping this mapping"
+                    )
+                    continue
+
+                # Generate URNs for the columns
+                source_urn = f"urn:dcs:column:{source_col_name}"
+                target_urn = f"urn:dcs:column:{raw_mapping.target_column}"
+
+                # Check if this mapping already exists
+                result = await self.session.execute(
+                    select(ColumnLineage).where(
+                        and_(
+                            ColumnLineage.source_column_id == source_column_id,
+                            ColumnLineage.target_column_id == target_column_id,
+                        )
+                    )
+                )
+                existing = result.scalar_one_or_none()
+
+                if not existing:
+                    # Create new column lineage edge
+                    edge = ColumnLineage(
+                        source_column_id=source_column_id,
+                        source_column_urn=source_urn,
+                        target_column_id=target_column_id,
+                        target_column_urn=target_urn,
+                        edge_type="derives_from",
+                        transformation_type=raw_mapping.transformation_type,
+                        transformation_logic=raw_mapping.transformation_logic,
+                        confidence=raw_mapping.confidence,
+                        detected_by=raw_mapping.detected_by,
+                        detection_metadata=raw_mapping.meta,
+                        ingestion_id=job.id,
+                    )
+                    self.session.add(edge)
+                    logger.info(
+                        f"✅ Created column lineage: {source_col_name} -> {raw_mapping.target_column} "
+                        f"(type: {raw_mapping.transformation_type}, confidence: {raw_mapping.confidence})"
+                    )
+                else:
+                    # Update existing with latest confidence and metadata
+                    existing.transformation_type = raw_mapping.transformation_type
+                    existing.transformation_logic = raw_mapping.transformation_logic
+                    existing.confidence = raw_mapping.confidence
+                    existing.detected_by = raw_mapping.detected_by
+                    existing.detection_metadata = raw_mapping.meta
+                    existing.ingestion_id = job.id
+                    logger.debug(
+                        f"Updated column lineage: {source_col_name} -> {raw_mapping.target_column}"
+                    )
+
+        except Exception as e:
+            logger.warning(f"Failed to store column mapping: {e}")
+            # Don't fail the entire ingestion for column mapping errors
+
+    async def _resolve_column_id(
+        self,
+        qualified_name: str,
+        urn_to_capsule: dict[str, Capsule],
+    ) -> Optional[UUID]:
+        """Resolve a qualified column name to a column ID (Phase 6.5).
+
+        Args:
+            qualified_name: Qualified column name (e.g., "orders.customer_id", "public.orders.customer_id")
+            urn_to_capsule: Map of capsule URNs to Capsule objects
+
+        Returns:
+            Column UUID if resolved, None otherwise
+        """
+        from sqlalchemy import select
+
+        from src.models.column import Column
+
+        try:
+            # Parse qualified name
+            # Formats: "table.column", "schema.table.column"
+            parts = qualified_name.split(".")
+
+            if len(parts) == 2:
+                # Format: "table.column"
+                table_name, column_name = parts
+                schema_name = None
+            elif len(parts) == 3:
+                # Format: "schema.table.column"
+                schema_name, table_name, column_name = parts
+            else:
+                # Unknown format
+                logger.debug(f"Could not parse qualified name: {qualified_name}")
+                return None
+
+            # Find matching capsule by name
+            matching_capsule = None
+            for capsule in urn_to_capsule.values():
+                # Match by capsule name (case-insensitive)
+                if capsule.name.lower() == table_name.lower():
+                    # If schema is specified, also check schema match
+                    if schema_name:
+                        if capsule.schema_name and capsule.schema_name.lower() == schema_name.lower():
+                            matching_capsule = capsule
+                            break
+                    else:
+                        matching_capsule = capsule
+                        break
+
+            if not matching_capsule:
+                logger.debug(f"Could not find capsule for table: {table_name}")
+                return None
+
+            # Find column by capsule_id and column name
+            result = await self.session.execute(
+                select(Column).where(
+                    and_(
+                        Column.capsule_id == matching_capsule.id,
+                        Column.name == column_name,
+                    )
+                )
+            )
+            column = result.scalar_one_or_none()
+
+            if column:
+                return column.id
+            else:
+                logger.debug(
+                    f"Could not find column '{column_name}' in capsule '{matching_capsule.name}'"
+                )
+                return None
+
+        except Exception as e:
+            logger.debug(f"Error resolving column '{qualified_name}': {e}")
+            return None
 
     async def _cleanup_orphans(
         self,

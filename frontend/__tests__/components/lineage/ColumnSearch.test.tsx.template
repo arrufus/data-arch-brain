@@ -1,0 +1,335 @@
+/**
+ * Column Search Component Test Template (Phase 7.6)
+ *
+ * This template demonstrates how to test the ColumnSearch component
+ * once a testing framework (Jest + React Testing Library) is set up.
+ *
+ * To use this template:
+ * 1. Install dependencies: npm install --save-dev jest @testing-library/react @testing-library/jest-dom
+ * 2. Configure Jest for Next.js
+ * 3. Rename this file to ColumnSearch.test.tsx
+ * 4. Run tests with: npm test
+ */
+
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import ColumnSearch from '@/components/lineage/ColumnSearch';
+import { useColumnSearch } from '@/lib/api/column-lineage';
+
+// Mock the API hook
+jest.mock('@/lib/api/column-lineage');
+
+const mockUseColumnSearch = useColumnSearch as jest.MockedFunction<typeof useColumnSearch>;
+
+// Mock router
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: jest.fn(),
+  }),
+}));
+
+describe('ColumnSearch', () => {
+  let queryClient: QueryClient;
+
+  beforeEach(() => {
+    queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+      },
+    });
+    jest.clearAllMocks();
+  });
+
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+
+  describe('Search Input', () => {
+    it('should render search input', () => {
+      mockUseColumnSearch.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        error: null,
+      } as any);
+
+      render(<ColumnSearch />, { wrapper });
+      expect(screen.getByPlaceholderText('Search columns by name...')).toBeInTheDocument();
+    });
+
+    it('should update search input on typing', () => {
+      mockUseColumnSearch.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        error: null,
+      } as any);
+
+      render(<ColumnSearch />, { wrapper });
+      const input = screen.getByPlaceholderText('Search columns by name...') as HTMLInputElement;
+
+      fireEvent.change(input, { target: { value: 'user_id' } });
+      expect(input.value).toBe('user_id');
+    });
+
+    it('should debounce search input (300ms)', async () => {
+      jest.useFakeTimers();
+      mockUseColumnSearch.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        error: null,
+      } as any);
+
+      render(<ColumnSearch />, { wrapper });
+      const input = screen.getByPlaceholderText('Search columns by name...');
+
+      fireEvent.change(input, { target: { value: 'user' } });
+
+      // Search should not trigger immediately
+      expect(mockUseColumnSearch).toHaveBeenCalledWith(
+        expect.not.objectContaining({ search: 'user' }),
+        undefined
+      );
+
+      // Fast-forward time
+      jest.advanceTimersByTime(300);
+
+      // Now search should trigger
+      await waitFor(() => {
+        expect(mockUseColumnSearch).toHaveBeenCalledWith(
+          expect.objectContaining({ search: 'user' }),
+          undefined
+        );
+      });
+
+      jest.useRealTimers();
+    });
+
+    it('should clear search input when clear button clicked', () => {
+      mockUseColumnSearch.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        error: null,
+      } as any);
+
+      render(<ColumnSearch defaultSearch="test" />, { wrapper });
+      const input = screen.getByPlaceholderText('Search columns by name...') as HTMLInputElement;
+
+      expect(input.value).toBe('test');
+
+      const clearButton = screen.getByTitle('Clear search');
+      fireEvent.click(clearButton);
+
+      expect(input.value).toBe('');
+    });
+  });
+
+  describe('Filter Panel', () => {
+    it('should show filter panel when filter button clicked', () => {
+      mockUseColumnSearch.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        error: null,
+      } as any);
+
+      render(<ColumnSearch />, { wrapper });
+
+      const filterButton = screen.getByText('Filters');
+      fireEvent.click(filterButton);
+
+      expect(screen.getByText('Filter Columns')).toBeInTheDocument();
+      expect(screen.getByText('Semantic Type')).toBeInTheDocument();
+      expect(screen.getByText('PII Type')).toBeInTheDocument();
+    });
+
+    it('should apply semantic type filter', () => {
+      mockUseColumnSearch.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        error: null,
+      } as any);
+
+      render(<ColumnSearch />, { wrapper });
+
+      fireEvent.click(screen.getByText('Filters'));
+
+      const semanticTypeSelect = screen.getByLabelText('Semantic Type') as HTMLSelectElement;
+      fireEvent.change(semanticTypeSelect, { target: { value: 'identifier' } });
+
+      expect(semanticTypeSelect.value).toBe('identifier');
+    });
+
+    it('should show active filter count badge', () => {
+      mockUseColumnSearch.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        error: null,
+      } as any);
+
+      render(<ColumnSearch />, { wrapper });
+
+      fireEvent.click(screen.getByText('Filters'));
+
+      // Apply two filters
+      fireEvent.change(screen.getByLabelText('Semantic Type'), {
+        target: { value: 'identifier' },
+      });
+      fireEvent.change(screen.getByLabelText('PII Type'), { target: { value: 'email' } });
+
+      // Check badge shows "2"
+      expect(screen.getByText('2')).toBeInTheDocument();
+    });
+
+    it('should clear all filters when clear button clicked', () => {
+      mockUseColumnSearch.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        error: null,
+      } as any);
+
+      render(<ColumnSearch />, { wrapper });
+
+      fireEvent.click(screen.getByText('Filters'));
+
+      // Apply filters
+      fireEvent.change(screen.getByLabelText('Semantic Type'), {
+        target: { value: 'identifier' },
+      });
+      fireEvent.change(screen.getByLabelText('PII Type'), { target: { value: 'email' } });
+
+      // Clear all
+      fireEvent.click(screen.getByText('Clear all'));
+
+      // Check filters are cleared
+      expect((screen.getByLabelText('Semantic Type') as HTMLSelectElement).value).toBe('');
+      expect((screen.getByLabelText('PII Type') as HTMLSelectElement).value).toBe('');
+    });
+  });
+
+  describe('Search Results', () => {
+    it('should show loading state', () => {
+      mockUseColumnSearch.mockReturnValue({
+        data: undefined,
+        isLoading: true,
+        error: null,
+      } as any);
+
+      render(<ColumnSearch defaultSearch="test" />, { wrapper });
+
+      expect(screen.getByText('Searching columns...')).toBeInTheDocument();
+    });
+
+    it('should show error state', () => {
+      mockUseColumnSearch.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        error: new Error('Search failed'),
+      } as any);
+
+      render(<ColumnSearch defaultSearch="test" />, { wrapper });
+
+      expect(screen.getByText('Search failed')).toBeInTheDocument();
+      expect(screen.getByText('Search failed')).toBeInTheDocument();
+    });
+
+    it('should show empty state when no results', () => {
+      mockUseColumnSearch.mockReturnValue({
+        data: {
+          data: [],
+          pagination: { total: 0, offset: 0, limit: 20, has_more: false },
+        },
+        isLoading: false,
+        error: null,
+      } as any);
+
+      render(<ColumnSearch defaultSearch="nonexistent" />, { wrapper });
+
+      expect(screen.getByText('No columns found')).toBeInTheDocument();
+    });
+
+    it('should display search results', () => {
+      mockUseColumnSearch.mockReturnValue({
+        data: {
+          data: [
+            {
+              id: '1',
+              urn: 'urn:dcs:column:users.user_id',
+              name: 'user_id',
+              data_type: 'integer',
+              semantic_type: 'identifier',
+              capsule_urn: 'urn:dcs:capsule:users',
+              capsule_name: 'users',
+              layer: 'staging',
+            },
+            {
+              id: '2',
+              urn: 'urn:dcs:column:users.email',
+              name: 'email',
+              data_type: 'varchar',
+              pii_type: 'email',
+              capsule_urn: 'urn:dcs:capsule:users',
+              capsule_name: 'users',
+              layer: 'staging',
+            },
+          ],
+          pagination: { total: 2, offset: 0, limit: 20, has_more: false },
+        },
+        isLoading: false,
+        error: null,
+      } as any);
+
+      render(<ColumnSearch defaultSearch="user" />, { wrapper });
+
+      expect(screen.getByText('Found')).toBeInTheDocument();
+      expect(screen.getByText('2')).toBeInTheDocument();
+      expect(screen.getByText('user_id')).toBeInTheDocument();
+      expect(screen.getByText('email')).toBeInTheDocument();
+      expect(screen.getByText('PII: email')).toBeInTheDocument();
+    });
+
+    it('should navigate to column lineage when result clicked', () => {
+      const mockPush = jest.fn();
+      jest.mocked(require('next/navigation').useRouter).mockReturnValue({
+        push: mockPush,
+      });
+
+      mockUseColumnSearch.mockReturnValue({
+        data: {
+          data: [
+            {
+              id: '1',
+              urn: 'urn:dcs:column:users.user_id',
+              name: 'user_id',
+              capsule_urn: 'urn:dcs:capsule:users',
+              capsule_name: 'users',
+            },
+          ],
+          pagination: { total: 1, offset: 0, limit: 20, has_more: false },
+        },
+        isLoading: false,
+        error: null,
+      } as any);
+
+      render(<ColumnSearch />, { wrapper });
+
+      const resultButton = screen.getByText('user_id');
+      fireEvent.click(resultButton);
+
+      expect(mockPush).toHaveBeenCalledWith(
+        '/lineage/columns/urn%3Adcs%3Acolumn%3Ausers.user_id'
+      );
+    });
+  });
+
+  describe('Help Text', () => {
+    it('should show help text when no search or filters', () => {
+      mockUseColumnSearch.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        error: null,
+      } as any);
+
+      render(<ColumnSearch />, { wrapper });
+
+      expect(screen.getByText(/Search for columns by name/)).toBeInTheDocument();
+    });
+  });
+});

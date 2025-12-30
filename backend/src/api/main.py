@@ -25,9 +25,11 @@ from src.api.routers import (
     domains,
     graph,
     health,
+    impact_analysis,
     indexes,
     ingest,
     masking_rules,
+    pipelines,
     products,
     quality_rules,
     redundancy,
@@ -240,6 +242,14 @@ OPENAPI_TAGS = [
         "name": "sla-incidents",
         "description": "SLA incident management - track violations, resolutions, and root causes"
     },
+    {
+        "name": "pipelines",
+        "description": "Pipeline orchestration metadata - DAGs, tasks, data flow mapping, and orchestration lineage"
+    },
+    {
+        "name": "impact-analysis",
+        "description": "Advanced impact analysis (Phase 8) - task-level impact, temporal analysis, alerts, and historical tracking"
+    },
 ]
 
 
@@ -294,6 +304,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router, prefix=settings.api_prefix, tags=["health"])
     app.include_router(ingest.router, prefix=settings.api_prefix, tags=["ingestion"])
     app.include_router(capsules.router, prefix=settings.api_prefix, tags=["capsules"])
+    app.include_router(pipelines.router, prefix=settings.api_prefix, tags=["pipelines"])
     app.include_router(columns.router, prefix=settings.api_prefix, tags=["columns"])
     app.include_router(constraints.router, prefix=settings.api_prefix, tags=["constraints"])
     app.include_router(indexes.router, prefix=settings.api_prefix, tags=["indexes"])
@@ -323,6 +334,9 @@ def create_app() -> FastAPI:
     app.include_router(transformation_code.router, prefix=settings.api_prefix, tags=["transformation-code"])
     app.include_router(capsule_contracts.router, prefix=settings.api_prefix, tags=["capsule-contracts"])
     app.include_router(sla_incidents.router, prefix=settings.api_prefix, tags=["sla-incidents"])
+
+    # Phase 8: Advanced Impact Analysis
+    app.include_router(impact_analysis.router, prefix=settings.api_prefix, tags=["impact-analysis"])
 
     # Register exception handlers
     register_exception_handlers(app)

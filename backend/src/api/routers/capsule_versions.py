@@ -91,6 +91,7 @@ async def create_capsule_version(
 async def list_capsule_versions(
     db: DbSession,
     capsule_id: Optional[str] = Query(None, description="Filter by capsule ID"),
+    capsule_urn: Optional[str] = Query(None, description="Filter by capsule URN"),
     change_type: Optional[str] = Query(None, description="Filter by change type"),
     breaking_only: bool = Query(False, description="Show only breaking changes"),
     current_only: bool = Query(False, description="Show only current versions"),
@@ -100,9 +101,22 @@ async def list_capsule_versions(
     """List capsule versions with optional filters."""
     repo = CapsuleVersionRepository(db)
 
-    if capsule_id:
-        versions = await repo.get_by_capsule(UUID(capsule_id), offset, limit)
-        total = await repo.count_by_capsule(UUID(capsule_id))
+    # Resolve URN to ID if needed
+    resolved_capsule_id = capsule_id
+    if capsule_urn and not capsule_id:
+        capsule_repo = CapsuleRepository(db)
+        capsule = await capsule_repo.get_by_urn(capsule_urn)
+        if capsule:
+            resolved_capsule_id = str(capsule.id)
+
+    if resolved_capsule_id:
+        capsule_uuid = UUID(resolved_capsule_id)
+        if current_only:
+            versions = await repo.get_current_by_capsule(capsule_uuid, offset, limit)
+            total = await repo.count_current_by_capsule(capsule_uuid)
+        else:
+            versions = await repo.get_by_capsule(capsule_uuid, offset, limit)
+            total = await repo.count_by_capsule(capsule_uuid)
     elif change_type:
         versions = await repo.get_by_change_type(change_type, offset, limit)
         total = await repo.count()

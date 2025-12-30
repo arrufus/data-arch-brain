@@ -1,0 +1,31 @@
+# Snowflake Integration - Production Configuration
+# Optimized for regular syncs with incremental updates
+
+# Connection with key-pair authentication (more secure)
+account: "myorg-account123"
+user: "dcs_service_user"
+private_key_path: "/etc/dcs/snowflake_key.p8"
+warehouse: "COMPUTE_WH"  # X-Small for cost efficiency
+role: "DCS_READER"
+
+# Scope - production databases only
+databases:
+  - "PROD"
+
+# Incremental sync - provide timestamp from previous sync
+# Update this value after each successful sync
+last_sync_timestamp: "2024-12-24T10:00:00+00:00"
+
+# Features - all enabled
+enable_lineage: true
+enable_tag_extraction: true
+use_account_usage: true
+lineage_lookback_days: 7
+
+# Performance - optimized for speed
+parallel_execution: true  # Process databases concurrently
+enable_query_cache: true  # Cache database list
+max_lineage_rows: 10000  # Limit ACCESS_HISTORY scan
+
+# Timeout
+query_timeout_seconds: 300  # 5 minutes

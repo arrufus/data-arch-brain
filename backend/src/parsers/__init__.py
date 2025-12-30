@@ -11,6 +11,9 @@ from src.parsers.base import (
     RawColumnEdge,
     RawDomain,
     RawEdge,
+    RawOrchestrationEdge,
+    RawPipeline,
+    RawPipelineTask,
     RawTag,
 )
 from src.parsers.dbt_config import (
@@ -24,11 +27,14 @@ from src.parsers.dbt_config import (
 from src.parsers.dbt_parser import DbtParser
 from src.parsers.airflow_config import AirflowParserConfig
 from src.parsers.airflow_parser import AirflowParser
+from src.parsers.snowflake_config import SnowflakeParserConfig
+from src.parsers.snowflake_parser import SnowflakeParser
 
 # Create and populate the default parser registry
 default_registry = ParserRegistry()
 default_registry.register("dbt", DbtParser)
 default_registry.register("airflow", AirflowParser)
+default_registry.register("snowflake", SnowflakeParser)
 
 
 def get_parser(source_type: str) -> MetadataParser:
@@ -53,6 +59,9 @@ __all__ = [
     "RawColumn",
     "RawDomain",
     "RawEdge",
+    "RawOrchestrationEdge",
+    "RawPipeline",
+    "RawPipelineTask",
     "RawTag",
     # dbt parser
     "DbtParser",
@@ -65,6 +74,9 @@ __all__ = [
     # Airflow parser
     "AirflowParser",
     "AirflowParserConfig",
+    # Snowflake parser
+    "SnowflakeParser",
+    "SnowflakeParserConfig",
     # Registry functions
     "default_registry",
     "get_parser",

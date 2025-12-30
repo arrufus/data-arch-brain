@@ -1,0 +1,33 @@
+# Snowflake Integration - Cost-Optimized Configuration
+# Minimizes Snowflake warehouse usage and costs
+
+# Connection
+account: "myorg-account123"
+user: "dcs_service_user"
+password_env: "SNOWFLAKE_PASSWORD"
+warehouse: "COMPUTE_WH"  # X-Small warehouse (lowest cost)
+role: "DCS_READER"
+
+# Scope - specific databases and schemas only
+databases:
+  - "PROD"
+schemas:
+  - "PUBLIC"
+  - "ANALYTICS"
+
+# Incremental sync - only changed tables
+last_sync_timestamp: "2024-12-24T10:00:00+00:00"
+
+# Features - aggressive limits
+enable_lineage: true
+enable_tag_extraction: false  # Disable if not needed
+use_account_usage: true
+lineage_lookback_days: 3  # Shorter window = less scan
+
+# Performance - optimized for cost
+parallel_execution: true
+enable_query_cache: true
+max_lineage_rows: 5000  # Aggressive limit = less scan
+
+# Timeout
+query_timeout_seconds: 180  # 3 minutes (faster timeout)
