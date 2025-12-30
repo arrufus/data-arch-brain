@@ -1427,7 +1427,7 @@ class ConformanceService:
                 # Check has_retention_policy constraint
                 if "has_retention_policy" in then and then["has_retention_policy"]:
                     has_retention = any(
-                        p.retention_days is not None for p in capsule.data_policies
+                        p.retention_period is not None for p in capsule.data_policies
                     ) if capsule.data_policies else False
                     if not has_retention:
                         violation_info = ViolationInfo(

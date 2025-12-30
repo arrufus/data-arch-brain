@@ -39,6 +39,12 @@ dependencies = [
     "orjson>=3.9.0",
     "pyyaml>=6.0.0",
     "ruamel.yaml>=0.18.0",
+    "sqlglot>=20.0.0",
+    "croniter>=2.0.0",
+
+    # Data source connectors
+    "snowflake-connector-python[pandas]>=3.5.0",
+    "cryptography>=41.0.0",
 
     # HTTP client (for future integrations)
     "httpx>=0.26.0",
@@ -177,6 +183,7 @@ show_column_numbers = true
 module = [
     "asyncpg.*",
     "uvicorn.*",
+    "snowflake.*",
 ]
 ignore_missing_imports = true
 

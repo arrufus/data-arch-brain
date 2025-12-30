@@ -47,6 +47,13 @@ class AirflowParserConfig:
     # URN configuration
     urn_prefix: str = "urn:dab:airflow"
 
+    # Phase 3: Data Flow Mapping Configuration
+    annotation_file: Optional[str] = None  # Path to manual annotation YAML/JSON file
+    dbt_manifest_path: Optional[str] = None  # Path to dbt manifest.json
+    dbt_project_name: Optional[str] = None  # dbt project name for URN construction
+    enable_sql_parsing: bool = True  # Enable automatic SQL parsing
+    sql_parser_dialect: str = "postgres"  # SQL dialect for parsing (postgres, snowflake, bigquery, etc.)
+
     # Compiled regex pattern (internal)
     _dag_id_pattern: Optional[re.Pattern[str]] = field(default=None, repr=False, init=False)
 
@@ -93,6 +100,12 @@ class AirflowParserConfig:
             password_env=data.get("password_env", "AIRFLOW_PASSWORD"),
             domain_tag_prefix=data.get("domain_tag_prefix", "domain:"),
             urn_prefix=data.get("urn_prefix", "urn:dab:airflow"),
+            # Phase 3 fields
+            annotation_file=data.get("annotation_file"),
+            dbt_manifest_path=data.get("dbt_manifest_path"),
+            dbt_project_name=data.get("dbt_project_name"),
+            enable_sql_parsing=data.get("enable_sql_parsing", True),
+            sql_parser_dialect=data.get("sql_parser_dialect", "postgres"),
         )
 
     def validate(self) -> list[str]:

@@ -106,9 +106,10 @@ class TestCLIHelp:
     def test_ingest_help(self):
         """Test ingest command help."""
         result = runner.invoke(app, ["ingest", "--help"])
-        
+
         assert result.exit_code == 0
-        assert "--manifest" in result.output
+        # Check that subcommands are listed
+        assert "dbt" in result.output or "airflow" in result.output
 
 
 class TestCLIOutput:

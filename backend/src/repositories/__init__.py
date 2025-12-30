@@ -21,6 +21,9 @@ from src.repositories.quality_rule import QualityRuleRepository
 from src.repositories.rule import RuleRepository
 from src.repositories.source_system import SourceSystemRepository
 from src.repositories.tag import CapsuleTagRepository, ColumnTagRepository, TagRepository
+from src.repositories.task_dependency import TaskDependencyRepository
+from src.repositories.impact_history import ImpactHistoryRepository
+from src.repositories.impact_alert import ImpactAlertRepository
 from src.repositories.value_domain import ValueDomainRepository
 from src.repositories.violation import ViolationRepository
 
@@ -56,6 +59,10 @@ __all__ = [
     "TagRepository",
     "CapsuleTagRepository",
     "ColumnTagRepository",
+    # Phase 8: Advanced Impact Analysis repositories
+    "TaskDependencyRepository",
+    "ImpactHistoryRepository",
+    "ImpactAlertRepository",
     # Phase 2: Value Domain repository
     "ValueDomainRepository",
     "ViolationRepository",

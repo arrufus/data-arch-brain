@@ -24,14 +24,33 @@ from src.models.data_product import CapsuleDataProduct, CapsuleRole, DataProduct
 from src.models.domain import Domain, Owner
 from src.models.index import CapsuleIndex, IndexType
 from src.models.ingestion import IngestionJob, IngestionStatus
-from src.models.lineage import CapsuleLineage, ColumnLineage
+from src.models.lineage import CapsuleLineage, ColumnLineage, ColumnVersion, TaskColumnEdge
 from src.models.masking_rule import MaskingMethod, MaskingRule
+from src.models.orchestration_edge import (
+    OrchestrationEdgeType,
+    PipelineTriggerEdge,
+    TaskDataEdge,
+    TaskDependencyEdge,
+)
+from src.models.pipeline import (
+    OperationType,
+    Pipeline,
+    PipelineRun,
+    PipelineTask,
+    PipelineType,
+    RunStatus,
+    TaskRun,
+    TaskType,
+)
 from src.models.quality_rule import QualityRule, QualityRuleCategory, QualityRuleSeverity, RuleType
 from src.models.rule import Rule, RuleCategory, RuleScope, RuleSeverity
 from src.models.sla_incident import IncidentSeverity, IncidentStatus, IncidentType, SLAIncident
 from src.models.source_system import SourceSystem
 from src.models.transformation_code import CodeLanguage, TransformationCode
 from src.models.tag import CapsuleTag, ColumnTag, Tag
+from src.models.task_dependency import TaskDependency
+from src.models.impact_history import ImpactHistory
+from src.models.impact_alert import ImpactAlert
 from src.models.value_domain import DomainType, ValueDomain
 from src.models.violation import Violation, ViolationStatus
 
@@ -91,9 +110,25 @@ __all__ = [
     # Lineage
     "CapsuleLineage",
     "ColumnLineage",
+    "ColumnVersion",
+    "TaskColumnEdge",
     # Masking Rule (Phase 4)
     "MaskingRule",
     "MaskingMethod",
+    # Orchestration Edges (Airflow Integration)
+    "TaskDataEdge",
+    "TaskDependencyEdge",
+    "PipelineTriggerEdge",
+    "OrchestrationEdgeType",
+    # Pipeline (Airflow Integration)
+    "Pipeline",
+    "PipelineTask",
+    "PipelineRun",
+    "TaskRun",
+    "PipelineType",
+    "TaskType",
+    "OperationType",
+    "RunStatus",
     # Quality Rule (Phase 3)
     "QualityRule",
     "RuleType",
@@ -115,6 +150,12 @@ __all__ = [
     "Tag",
     "CapsuleTag",
     "ColumnTag",
+    # Task Dependency (Phase 8)
+    "TaskDependency",
+    # Impact History (Phase 8)
+    "ImpactHistory",
+    # Impact Alert (Phase 8)
+    "ImpactAlert",
     # Transformation Code (Phase 5-6)
     "TransformationCode",
     "CodeLanguage",

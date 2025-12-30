@@ -189,6 +189,14 @@ def ingest_airflow(
         "--cleanup-orphans",
         help="Remove capsules from previous ingestions that are no longer present",
     ),
+    annotation_file: Optional[Path] = typer.Option(
+        None,
+        "--annotation-file", "-f",
+        help="Path to YAML annotation file mapping tasks to data assets",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+    ),
 ):
     """
     Ingest Airflow DAG and task metadata via REST API.
@@ -218,6 +226,10 @@ def ingest_airflow(
       # Include paused DAGs
 
       dab ingest airflow --base-url https://airflow.example.com --include-paused
+
+      # With data flow annotations
+
+      dab ingest airflow --base-url https://airflow.example.com --annotation-file annotations.yml
     """
     from src.database import async_session_maker
     from src.services.ingestion import IngestionService
@@ -257,11 +269,180 @@ def ingest_airflow(
                     page_limit=page_limit,
                     timeout_seconds=timeout,
                     cleanup_orphans=cleanup_orphans,
+                    annotation_file=str(annotation_file) if annotation_file else None,
                 )
 
                 progress.update(task, completed=True)
 
             _display_ingestion_result(result, "airflow")
+            await session.commit()
+
+    run_async(_ingest())
+
+
+@ingest_app.command("snowflake")
+def ingest_snowflake(
+    account: str = typer.Option(
+        ...,
+        "--account", "-a",
+        help="Snowflake account identifier (e.g., myorg-account123)",
+    ),
+    user: str = typer.Option(
+        ...,
+        "--user", "-u",
+        help="Snowflake username",
+    ),
+    warehouse: str = typer.Option(
+        "COMPUTE_WH",
+        "--warehouse", "-w",
+        help="Warehouse for metadata queries",
+    ),
+    role: str = typer.Option(
+        "SYSADMIN",
+        "--role", "-r",
+        help="Role for querying metadata",
+    ),
+    password_env: str = typer.Option(
+        "SNOWFLAKE_PASSWORD",
+        "--password-env",
+        help="Environment variable name for password",
+    ),
+    private_key_path: Optional[Path] = typer.Option(
+        None,
+        "--private-key",
+        help="Path to private key file for key-pair authentication",
+    ),
+    databases: Optional[str] = typer.Option(
+        None,
+        "--databases", "-d",
+        help="Comma-separated list of databases to scan (empty = all accessible)",
+    ),
+    schemas: Optional[str] = typer.Option(
+        None,
+        "--schemas", "-s",
+        help="Comma-separated list of schema patterns to include",
+    ),
+    include_views: bool = typer.Option(
+        True,
+        "--include-views/--no-views",
+        help="Include views in ingestion",
+    ),
+    include_materialized_views: bool = typer.Option(
+        True,
+        "--include-materialized-views/--no-materialized-views",
+        help="Include materialized views",
+    ),
+    include_external_tables: bool = typer.Option(
+        True,
+        "--include-external-tables/--no-external-tables",
+        help="Include external tables",
+    ),
+    enable_lineage: bool = typer.Option(
+        False,
+        "--enable-lineage",
+        help="Extract lineage from ACCESS_HISTORY (requires --use-account-usage)",
+    ),
+    lineage_lookback_days: int = typer.Option(
+        7,
+        "--lineage-lookback-days",
+        help="Days to look back for lineage (1-365)",
+    ),
+    use_account_usage: bool = typer.Option(
+        False,
+        "--use-account-usage",
+        help="Use ACCOUNT_USAGE views (required for lineage & tags)",
+    ),
+    enable_tag_extraction: bool = typer.Option(
+        False,
+        "--enable-tag-extraction",
+        help="Extract Snowflake tags (requires --use-account-usage)",
+    ),
+    cleanup_orphans: bool = typer.Option(
+        False,
+        "--cleanup-orphans",
+        help="Remove capsules from previous ingestions that are no longer present",
+    ),
+):
+    """
+    Ingest Snowflake table and column metadata from INFORMATION_SCHEMA and ACCOUNT_USAGE.
+
+    Authentication credentials should be provided via environment variables.
+    By default, reads password from SNOWFLAKE_PASSWORD environment variable.
+    For production, prefer key-pair authentication via --private-key.
+
+    Examples:
+
+      # Basic ingestion with password authentication
+      export SNOWFLAKE_PASSWORD=your-password
+      dcs ingest snowflake --account myorg-account123 --user dcs_service_user
+
+      # With key-pair authentication
+      dcs ingest snowflake --account myorg-account123 --user dcs_service_user \\
+        --private-key /path/to/rsa_key.p8
+
+      # Specific databases with lineage
+      dcs ingest snowflake --account myorg-account123 --user dcs_service_user \\
+        --databases PROD,ANALYTICS --enable-lineage --use-account-usage
+
+      # Filter by schema patterns
+      dcs ingest snowflake --account myorg-account123 --user dcs_service_user \\
+        --schemas "PROD.*,ANALYTICS.MARTS_*"
+    """
+    import os
+    from src.database import async_session_maker
+    from src.services.ingestion import IngestionService
+
+    # Parse comma-separated lists
+    database_list = [d.strip() for d in databases.split(",")] if databases else None
+    schema_list = [s.strip() for s in schemas.split(",")] if schemas else None
+
+    # Get password from environment if needed
+    password = None
+    if not private_key_path:
+        password = os.environ.get(password_env)
+        if not password:
+            console.print(
+                f"[red]Error: Password not found in environment variable {password_env}[/red]"
+            )
+            console.print(
+                f"Set the environment variable: export {password_env}=your-password"
+            )
+            console.print("Or use key-pair authentication with --private-key")
+            raise typer.Exit(1)
+
+    async def _ingest():
+        async with async_session_maker() as session:
+            service = IngestionService(session)
+
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console,
+            ) as progress:
+                task = progress.add_task("Ingesting Snowflake metadata...", total=None)
+
+                result = await service.ingest_snowflake(
+                    account=account,
+                    user=user,
+                    warehouse=warehouse,
+                    role=role,
+                    password=password,
+                    private_key_path=str(private_key_path) if private_key_path else None,
+                    databases=database_list,
+                    schemas=schema_list,
+                    include_views=include_views,
+                    include_materialized_views=include_materialized_views,
+                    include_external_tables=include_external_tables,
+                    enable_lineage=enable_lineage,
+                    lineage_lookback_days=lineage_lookback_days,
+                    use_account_usage=use_account_usage,
+                    enable_tag_extraction=enable_tag_extraction,
+                    cleanup_orphans=cleanup_orphans,
+                )
+
+                progress.update(task, completed=True)
+
+            _display_ingestion_result(result, "snowflake")
             await session.commit()
 
     run_async(_ingest())

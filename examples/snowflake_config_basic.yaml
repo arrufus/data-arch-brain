@@ -1,0 +1,24 @@
+# Snowflake Integration - Basic Configuration
+# Use this for initial testing and development
+
+# Connection (required)
+account: "myorg-account123"  # Format: orgname-accountname
+user: "dcs_service_user"
+password_env: "SNOWFLAKE_PASSWORD"  # Store password in environment variable
+warehouse: "COMPUTE_WH"
+role: "DCS_READER"
+
+# Scope - specify databases to ingest
+databases:
+  - "PROD"
+
+# Features - enable all by default
+enable_lineage: true
+enable_tag_extraction: true
+use_account_usage: true
+lineage_lookback_days: 7
+
+# Performance - use defaults
+parallel_execution: true
+enable_query_cache: true
+max_lineage_rows: 10000

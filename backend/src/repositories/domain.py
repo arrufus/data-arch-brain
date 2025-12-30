@@ -19,7 +19,11 @@ class DomainRepository(BaseRepository[Domain]):
 
     async def get_by_name(self, name: str) -> Optional[Domain]:
         """Get domain by name (case-insensitive)."""
-        stmt = select(Domain).where(func.lower(Domain.name) == name.lower())
+        stmt = (
+            select(Domain)
+            .options(selectinload(Domain.owner))
+            .where(func.lower(Domain.name) == name.lower())
+        )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 

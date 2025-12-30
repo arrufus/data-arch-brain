@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from src.models.quality_rule import QualityRule
     from src.models.source_system import SourceSystem
     from src.models.tag import CapsuleTag
+    from src.models.task_dependency import TaskDependency
     from src.models.violation import Violation
 
 
@@ -193,6 +194,12 @@ class Capsule(DCSBase, URNMixin, MetadataMixin):
         back_populates="capsule",
         cascade="all, delete-orphan",
         foreign_keys="SLAIncident.capsule_id",
+    )
+
+    # Phase 8: Task dependencies (advanced impact analysis)
+    task_dependencies: Mapped[list["TaskDependency"]] = relationship(
+        back_populates="capsule",
+        cascade="all, delete-orphan",
     )
 
     @property

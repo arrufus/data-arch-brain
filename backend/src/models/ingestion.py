@@ -12,6 +12,12 @@ from src.models.base import DCSBase, JSONType
 if TYPE_CHECKING:
     from src.models.capsule import Capsule
     from src.models.lineage import CapsuleLineage, ColumnLineage
+    from src.models.orchestration_edge import (
+        PipelineTriggerEdge,
+        TaskDataEdge,
+        TaskDependencyEdge,
+    )
+    from src.models.pipeline import Pipeline, PipelineTask
     from src.models.violation import Violation
 
 
@@ -62,6 +68,21 @@ class IngestionJob(DCSBase):
         back_populates="ingestion_job"
     )
     violations: Mapped[list["Violation"]] = relationship(back_populates="ingestion_job")
+
+    # Orchestration relationships (Airflow Integration)
+    pipelines: Mapped[list["Pipeline"]] = relationship(back_populates="ingestion_job")
+    pipeline_tasks: Mapped[list["PipelineTask"]] = relationship(
+        back_populates="ingestion_job"
+    )
+    task_data_edges: Mapped[list["TaskDataEdge"]] = relationship(
+        back_populates="ingestion_job"
+    )
+    task_dependency_edges: Mapped[list["TaskDependencyEdge"]] = relationship(
+        back_populates="ingestion_job"
+    )
+    pipeline_trigger_edges: Mapped[list["PipelineTriggerEdge"]] = relationship(
+        back_populates="ingestion_job"
+    )
 
     @property
     def duration_seconds(self) -> Optional[float]:

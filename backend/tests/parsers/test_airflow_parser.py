@@ -353,35 +353,36 @@ class TestAirflowParser:
             assert result.source_name == "test-airflow"
             assert result.source_version == "2.7.0"
 
-            # Should have 1 DAG + 2 tasks = 3 capsules
-            assert len(result.capsules) == 3
+            # Should have 1 pipeline + 2 tasks (NOT capsules)
+            assert len(result.pipelines) == 1
+            assert len(result.pipeline_tasks) == 2
 
-            # Check DAG capsule
-            dag_capsule = result.capsules[0]
-            assert dag_capsule.capsule_type == "airflow_dag"
-            assert dag_capsule.name == "test_dag"
-            assert "urn:dab:airflow:dag:test-airflow:test_dag" in dag_capsule.urn
-            assert dag_capsule.domain_name == "analytics"
+            # Check DAG pipeline (NOT capsule)
+            dag_pipeline = result.pipelines[0]
+            assert dag_pipeline.pipeline_type == "airflow_dag"
+            assert dag_pipeline.name == "test_dag"
+            assert dag_pipeline.urn == "urn:dcs:pipeline:airflow:test-airflow:test_dag"
+            assert dag_pipeline.domain_name == "analytics"
 
-            # Check task capsules
-            task_capsules = [c for c in result.capsules if c.capsule_type == "airflow_task"]
-            assert len(task_capsules) == 2
+            # Check pipeline tasks (NOT capsules)
+            assert len(result.pipeline_tasks) == 2
 
-            task1 = next(c for c in task_capsules if c.name == "task1")
-            assert "BashOperator" in task1.meta["operator"]
+            task1 = next(t for t in result.pipeline_tasks if t.name == "task1")
+            assert task1.operator == "BashOperator"
+            assert task1.task_type == "bash"
 
-            # Should have edges: DAG→task1, DAG→task2, task1→task2 = 3 edges
-            assert len(result.edges) == 3  # 2 CONTAINS + 1 FLOWS_TO
+            # Should have orchestration edges: pipeline→task1, pipeline→task2, task1→task2 = 3 edges
+            assert len(result.orchestration_edges) == 3  # 2 CONTAINS + 1 DEPENDS_ON
 
             # Check containment edges
-            contains_edges = [e for e in result.edges if e.edge_type == "contains"]
+            contains_edges = [e for e in result.orchestration_edges if e.edge_type == "contains"]
             assert len(contains_edges) == 2
 
             # Check dependency edges
-            flows_to_edges = [e for e in result.edges if e.edge_type == "flows_to"]
-            assert len(flows_to_edges) == 1
-            assert flows_to_edges[0].source_urn.endswith("task1")
-            assert flows_to_edges[0].target_urn.endswith("task2")
+            depends_on_edges = [e for e in result.orchestration_edges if e.edge_type == "depends_on"]
+            assert len(depends_on_edges) == 1
+            assert "task1" in depends_on_edges[0].source_urn
+            assert "task2" in depends_on_edges[0].target_urn
 
     @pytest.mark.asyncio
     async def test_parse_with_api_error(self, airflow_parser, basic_config):
@@ -403,7 +404,8 @@ class TestAirflowParser:
 
             # Should have warnings/errors but not crash
             assert result.error_count > 0 or result.warning_count > 0
-            assert len(result.capsules) == 0  # No data extracted
+            assert len(result.pipelines) == 0  # No data extracted
+            assert len(result.pipeline_tasks) == 0  # No data extracted
 
     @pytest.mark.asyncio
     async def test_parse_urn_construction(self, airflow_parser):
@@ -458,9 +460,9 @@ class TestAirflowParser:
 
             result = await airflow_parser.parse(config)
 
-            # Check URN format
-            dag_capsule = result.capsules[0]
-            assert dag_capsule.urn == "urn:dab:airflow:dag:prod:customer_pipeline"
+            # Check URN format for pipelines and tasks
+            dag_pipeline = result.pipelines[0]
+            assert dag_pipeline.urn == "urn:dcs:pipeline:airflow:prod:customer_pipeline"
 
-            task_capsule = result.capsules[1]
-            assert task_capsule.urn == "urn:dab:airflow:task:prod:customer_pipeline.extract"
+            task = result.pipeline_tasks[0]
+            assert task.urn == "urn:dcs:task:airflow:prod:customer_pipeline.extract"

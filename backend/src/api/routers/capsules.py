@@ -10,6 +10,7 @@ from sqlalchemy import text
 from src.api.exceptions import NotFoundError, ValidationError_
 from src.database import DbSession
 from src.repositories import CapsuleRepository, ColumnRepository
+from src.repositories.pipeline import TaskDataEdgeRepository
 
 router = APIRouter(prefix="/capsules")
 
@@ -435,6 +436,72 @@ async def get_capsule_lineage(
             "depth_requested": depth,
         },
     )
+
+
+@router.get("/{urn:path}/producers")
+async def get_capsule_producers(
+    urn: str,
+    db: DbSession,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(50, le=100),
+) -> dict:
+    """Get tasks that produce (write to) this capsule.
+
+    Returns a list of pipeline tasks that create or update this capsule,
+    along with their pipeline information and operation details.
+    """
+    repo = CapsuleRepository(db)
+    capsule = await repo.get_by_urn(urn)
+
+    if not capsule:
+        raise NotFoundError("Capsule", urn)
+
+    edge_repo = TaskDataEdgeRepository(db)
+    producers = await edge_repo.get_producers(urn, offset=offset, limit=limit)
+
+    return {
+        "capsule_urn": urn,
+        "capsule_name": capsule.name,
+        "producer_count": len(producers),
+        "producers": producers,
+        "pagination": {
+            "offset": offset,
+            "limit": limit,
+        },
+    }
+
+
+@router.get("/{urn:path}/consumers")
+async def get_capsule_consumers(
+    urn: str,
+    db: DbSession,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(50, le=100),
+) -> dict:
+    """Get tasks that consume (read from) this capsule.
+
+    Returns a list of pipeline tasks that read from this capsule,
+    along with their pipeline information and access pattern details.
+    """
+    repo = CapsuleRepository(db)
+    capsule = await repo.get_by_urn(urn)
+
+    if not capsule:
+        raise NotFoundError("Capsule", urn)
+
+    edge_repo = TaskDataEdgeRepository(db)
+    consumers = await edge_repo.get_consumers(urn, offset=offset, limit=limit)
+
+    return {
+        "capsule_urn": urn,
+        "capsule_name": capsule.name,
+        "consumer_count": len(consumers),
+        "consumers": consumers,
+        "pagination": {
+            "offset": offset,
+            "limit": limit,
+        },
+    }
 
 
 @router.get("/{urn:path}/violations")

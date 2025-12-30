@@ -1,5 +1,0 @@
-⠙ Ingesting dbt metadata...
-
-✗ Ingestion failed!
-  Job ID: 408967a2-20a5-4493-9c36-7a9078e4bb07
-  Error: 'Capsule' object has no attribute 'config'
