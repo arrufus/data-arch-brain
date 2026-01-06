@@ -323,7 +323,7 @@ async def analyze_column_impact(
             change_timestamp=parsed_timestamp,
         )
     except ValueError as e:
-        raise NotFoundError(str(e))
+        raise NotFoundError("Column", column_urn)
 
     # Build temporal impact response if available
     temporal_impact_response = None
@@ -634,7 +634,7 @@ async def acknowledge_alert(
 
     alert = await repo.acknowledge_alert(alert_id=alert_id, acknowledged_by=acknowledged_by)
     if not alert:
-        raise NotFoundError(f"Alert not found: {alert_id}")
+        raise NotFoundError("ImpactAlert", str(alert_id))
 
     await db.commit()
 
@@ -663,7 +663,7 @@ async def resolve_alert(alert_id: UUID, db: DbSession) -> ImpactAlertResponse:
 
     alert = await repo.resolve_alert(alert_id=alert_id)
     if not alert:
-        raise NotFoundError(f"Alert not found: {alert_id}")
+        raise NotFoundError("ImpactAlert", str(alert_id))
 
     await db.commit()
 

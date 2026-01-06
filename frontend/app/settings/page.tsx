@@ -723,7 +723,7 @@ function ConformanceRulesTab() {
         </div>
         <div className="flex gap-3">
           <button
-            onClick={() => exportRulesMutation.mutate()}
+            onClick={() => exportRulesMutation.mutate(undefined)}
             disabled={exportRulesMutation.isPending}
             className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
           >

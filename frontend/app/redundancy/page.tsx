@@ -154,7 +154,7 @@ export default function RedundancyPage() {
               isLoadingCapsules={isLoadingCapsules}
               similarData={similarData}
               isLoadingSimilar={isLoadingSimilar}
-              onCapsuleSelect={(urn) => {
+              onCapsuleSelect={(urn: string) => {
                 setSelectedCapsuleUrn(urn);
                 setCapsuleSearch('');
                 setIsDropdownOpen(false);

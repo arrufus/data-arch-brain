@@ -95,6 +95,7 @@ export default function TaskImpactGraph({
     });
 
     let taskYOffset = 0;
+    let taskGlobalIndex = 0;
     dagTaskMap.forEach((dagTasks, dagId) => {
       dagTasks.forEach((task, taskIndex) => {
         const taskColor =
@@ -131,9 +132,9 @@ export default function TaskImpactGraph({
           },
         });
 
-        // Edge from DAG to Task
+        // Edge from DAG to Task - use global index to ensure uniqueness
         newEdges.push({
-          id: `edge-dag-${dagId}-${taskId}`,
+          id: `edge-dag-task-${taskGlobalIndex}`,
           source: `dag-${dagId}`,
           target: taskId,
           animated: task.risk_level === 'critical',
@@ -143,6 +144,8 @@ export default function TaskImpactGraph({
             color: taskColor,
           },
         });
+
+        taskGlobalIndex++;
       });
 
       taskYOffset += dagTasks.length * 100 + 50;
