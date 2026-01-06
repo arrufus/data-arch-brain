@@ -586,7 +586,7 @@ function getIncidentStatusVariant(status: IncidentStatus): 'danger' | 'warning' 
 }
 
 function getSLATypeIcon(slaType: string) {
-  const iconMap: Record<string, JSX.Element> = {
+  const iconMap: Record<string, React.JSX.Element> = {
     freshness: <Clock className="w-4 h-4 text-blue-500" />,
     completeness: <CheckCircle className="w-4 h-4 text-green-500" />,
     quality: <Shield className="w-4 h-4 text-purple-500" />,

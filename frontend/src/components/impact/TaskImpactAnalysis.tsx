@@ -33,7 +33,9 @@ interface DAGImpact {
   dag_id: string;
   affected_task_count: number;
   critical_task_count: number;
+  high_risk_task_count: number;
   max_risk_score: number;
+  avg_risk_score: number;
   tasks: TaskImpact[];
 }
 
